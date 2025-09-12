@@ -3,3 +3,6 @@
 
 # ftz files
 *.ftz
+
+# Virtual environment
+venv/
