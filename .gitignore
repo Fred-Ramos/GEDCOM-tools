@@ -1,0 +1,5 @@
+# Log files
+*.log
+
+# ftz files
+*.ftz
