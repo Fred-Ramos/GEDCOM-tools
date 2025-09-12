@@ -9,23 +9,44 @@ def convert(file):
         print(f"Processing {file} ...")
 
         with zipfile.ZipFile(file, 'r') as archive:
-            for name in archive.namelist():
-                # Collect .jpg under FamilyTree/faces/
-                if name.startswith("FamilyTree/faces/") and name.lower().endswith(".jpg"):
-                    with archive.open(name) as f:
-                        faces_images.append((name, BytesIO(f.read())))
+            all_files = archive.namelist()
 
-                # Collect node.ftt (mandatory)
-                elif name == "FamilyTree/node.ftt":
+            # Detect top-level folder (first part before '/')
+            top_folders = {name.split("/")[0] for name in all_files if "/" in name}
+            if not top_folders:
+                print("⚠️ No folder structure found inside the archive.")
+                return faces_images, node_file
+
+            folder_name = top_folders.pop()  # assume only one root
+            print(f"Found Family Tree: {folder_name}")
+
+            # Check if faces folder exists
+            has_faces_folder = any(name.startswith(f"{folder_name}/faces/") for name in all_files)
+
+            if has_faces_folder:
+                for name in all_files:
+                    if name.startswith(f"{folder_name}/faces/") and name.lower().endswith(".jpg"):
+                        with archive.open(name) as f:
+                            faces_images.append((name, BytesIO(f.read())))
+                print(f"Faces folder found with {len(faces_images)} image(s).")
+                if faces_images:
+                    print("Faces list:")
+                    for fname, _ in faces_images:
+                        print(" -", fname)
+            else:
+                print("No faces folder available.")
+
+            # Collect node.ftt (mandatory)
+            for name in all_files:
+                if name == f"{folder_name}/node.ftt":
                     with archive.open(name) as f:
                         node_file = (name, f.read())
+                    break
 
-        # Debug summary
-        print(f"Found {len(faces_images)} faces")
+        # Debug summary for node.ftt
         if node_file:
             print("Found node.ftt")
             try:
-                # Try decoding as UTF-8 plain text
                 text = node_file[1].decode("utf-8")
                 print("\n===== node.ftt contents =====")
                 print(text)
@@ -44,6 +65,3 @@ def convert(file):
 if __name__ == "__main__":
     ORIGIN_FILE = "pais.ftz"  # change this path if needed
     faces_images, node_file = convert(ORIGIN_FILE)
-
-    # Example: just listing image names
-    print("Faces list:", [name for name, _ in faces_images])

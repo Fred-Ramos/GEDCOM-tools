@@ -1,8 +1,9 @@
 # Log files
 *.log
 
-# ftz files
+# familytree files
 *.ftz
+*.ged
 
 # Virtual environment
 venv/
