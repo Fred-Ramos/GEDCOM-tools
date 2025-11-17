@@ -13,8 +13,12 @@ from .utils import (
     _to_float,
 )
 
+# -----------------------------
+# Parsing .ftt file information
+# -----------------------------
 def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_ftt]]:
     """
+    Parse a str from a .ftt file
     Expected layout: TSV (tab-separated values).
     Header line: <n_people>\t<n_couples>\t<last_addition_id>
     People lines (tab-delimited):
