@@ -1,4 +1,4 @@
-# GEDCOM Tools --- FTZ → GEDCOM Converter
+# GEDCOM Tools (FTZ → GEDCOM Converter)
 
 Converts **.ftz** archives (fromat from the *Quick Family Tree* app) into
 standard **GEDCOM 5.5.1** files, compatible with most genealogy
