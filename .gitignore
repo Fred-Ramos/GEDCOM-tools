@@ -1,9 +1,9 @@
-# Log files
-*.log
+# Config file
+config.json
 
 # familytree files
 *.ftz
 *.ged
 
-# Virtual environment
-venv/
+# Pycache
+__pycache__/
