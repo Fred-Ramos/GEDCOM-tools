@@ -1,6 +1,6 @@
-# GEDCOM tools (.ftz/.ftt file converter)
+# GEDCOM tools (.ftz file converter)
 
-This repository converts .ftz family tree files to the general standard format GEDCOM, which can easily be used for generating graphs, printing and in other programs.
+This repository converts .ftz family tree archives (used in the android app **Quick Family Tree**) into standard GEDCOM 5.5.1 files, compatible with most genealogy tools.
 
 ## Usage
 
