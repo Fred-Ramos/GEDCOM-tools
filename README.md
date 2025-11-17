@@ -4,13 +4,26 @@ This repository converts .ftz family tree files to the general standard format G
 
 ## Usage
 
-Clone the repository, make sure **python** is installed and then place all **.ftz** you which to convert in the same directory as **main.py**. Then simply open the directory location in the terminal and run:
+1.  Clone or download this repository.
+2.  Place all `.ftz` files you want to convert in the same directory as
+    `main.py`.
+3.  Run:
 
-   ```bash
-   python main.py
-   ```
+``` bash
+python3 main.py
+```
 
---------------
+Each `.ftz` file will be converted into a `.ged` file with the same
+name:
 
-**Note**: Person's images are being detected but not being used for now
+    example.ftz  ->  example.ged
 
+## Requirements
+
+-   Python 3.8+
+-   No external dependencies required
+
+## Notes
+
+-   Person images inside FTZ files are detected but currently not
+    exported.
