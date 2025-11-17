@@ -8,27 +8,10 @@ from .models import (
     Couple
 )
 
-# ---------------------------
-# Parsing helpers
-# ---------------------------
-def _to_int(x: str) -> Optional[int]:
-    try:
-        v = int(x)
-        return None if v == 0 else v
-    except Exception:
-        return None
-
-def _to_int_keep0(x: str) -> int:
-    try:
-        return int(x)
-    except Exception:
-        return 0
-
-def _to_float(x: str) -> float:
-    try:
-        return float(x)
-    except Exception:
-        return 0.0
+from .utils import (
+    _to_int,
+    _to_float,
+)
 
 def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
     """
@@ -60,33 +43,33 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
         if len(parts) < 29:
             parts += [""] * (29 - len(parts))
 
-        pid = _to_int_keep0(parts[0])
+        pid = _to_int(parts[0], None_is_0=True)
         person = Person(
             id=pid,
-            reserved=_to_int_keep0(parts[1]),
+            reserved=_to_int(parts[1], None_is_0=True),
             parent_couple_id=_to_int(parts[2]),
-            unk4=_to_int_keep0(parts[3]),
-            unk5=_to_int_keep0(parts[4]),
-            unk6=_to_int_keep0(parts[5]),
+            unk4=_to_int(parts[3], None_is_0=True),
+            unk5=_to_int(parts[4], None_is_0=True),
+            unk6=_to_int(parts[5], None_is_0=True),
             f1=_to_float(parts[6]),
             f2=_to_float(parts[7]),
-            unk9=_to_int_keep0(parts[8]),
-            unk10=_to_int_keep0(parts[9]),
-            unk11=_to_int_keep0(parts[10]),
-            unk12=_to_int_keep0(parts[11]),
+            unk9=_to_int(parts[8], None_is_0=True),
+            unk10=_to_int(parts[9], None_is_0=True),
+            unk11=_to_int(parts[10], None_is_0=True),
+            unk12=_to_int(parts[11], None_is_0=True),
             surname=parts[12].strip(),
             name=parts[13].strip(),
             tab_unk1=parts[14],
             tab_unk2=parts[15],
-            birth_event=_to_int_keep0(parts[16]),
+            birth_event=_to_int(parts[16], None_is_0=True),
             birth_year=_to_int(parts[17]),
             birth_month=_to_int(parts[18]),
             birth_day=_to_int(parts[19]),
-            death_event=_to_int_keep0(parts[20]),
+            death_event=_to_int(parts[20], None_is_0=True),
             death_year=_to_int(parts[21]),
             death_month=_to_int(parts[22]),
             death_day=_to_int(parts[23]),
-            sex=_to_int_keep0(parts[24]),
+            sex=_to_int(parts[24], None_is_0=True),
             addition=(parts[25].strip() or None),
             note=(parts[26].strip() or None),
             tab_unk3=parts[27],
@@ -101,20 +84,20 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
         if len(parts) < 12:
             parts += ["0"] * (12 - len(parts))
 
-        cid = _to_int_keep0(parts[0])
+        cid = _to_int(parts[0], None_is_0=True)
         couple = Couple(
             id=cid,
-            divorce=_to_int_keep0(parts[1]),
+            divorce=_to_int(parts[1], None_is_0=True),
             male_id=_to_int(parts[2]),
-            unk4=_to_int_keep0(parts[3]),
+            unk4=_to_int(parts[3], None_is_0=True),
             female_id=_to_int(parts[4]),
-            unk6=_to_int_keep0(parts[5]),
+            unk6=_to_int(parts[5], None_is_0=True),
             f1=_to_float(parts[6]),
             f2=_to_float(parts[7]),
-            unk9=_to_int_keep0(parts[8]),
-            unk10=_to_int_keep0(parts[9]),
-            unk11=_to_int_keep0(parts[10]),
-            unk12=_to_int_keep0(parts[11]),
+            unk9=_to_int(parts[8], None_is_0=True),
+            unk10=_to_int(parts[9], None_is_0=True),
+            unk11=_to_int(parts[10], None_is_0=True),
+            unk12=_to_int(parts[11], None_is_0=True),
         )
         couples_by_id[couple.id] = couple
 
