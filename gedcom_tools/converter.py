@@ -4,8 +4,8 @@ from typing import Optional, Dict, List, Tuple
 from datetime import datetime
 
 from .models import (
-    Person,
-    Couple
+    Person_ftt,
+    Couple_ftt
 )
 
 from .utils import (
@@ -13,7 +13,7 @@ from .utils import (
     _to_float,
 )
 
-def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
+def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_ftt]]:
     """
     Expected layout: TSV (tab-separated values).
     Header line: <n_people>\t<n_couples>\t<last_addition_id>
@@ -23,7 +23,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
       16:birth_event 17:birth_year 18:birth_month 19:birth_day
       20:death_event 21:death_year 22:death_month 23:death_day
       24:sex 25:addition 26:note 27:tab_unk3 28:tab_unk4
-    Couples lines (tab-delimited) with your existing mapping.
+    Couple_ftts lines (tab-delimited) with your existing mapping.
     """
     lines = [ln for ln in text.splitlines() if ln.strip()]
     if not lines:
@@ -34,8 +34,8 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
     n_people = int(hdr_parts[0].lstrip("\ufeff"))
     n_couples = int(hdr_parts[1])
 
-    people_by_id: Dict[int, Person] = {}
-    couples_by_id: Dict[int, Couple] = {}
+    people_by_id: Dict[int, Person_ftt] = {}
+    couples_by_id: Dict[int, Couple_ftt] = {}
 
     # People: lines[1 : 1 + n_people]
     for i in range(1, 1 + n_people):
@@ -44,7 +44,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
             parts += [""] * (29 - len(parts))
 
         pid = _to_int(parts[0], None_is_0=True)
-        person = Person(
+        person = Person_ftt(
             id=pid,
             reserved=_to_int(parts[1], None_is_0=True),
             parent_couple_id=_to_int(parts[2]),
@@ -77,7 +77,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
         )
         people_by_id[person.id] = person
 
-    # Couples
+    # Couple_ftts
     start_couples = 1 + n_people
     for i in range(start_couples, start_couples + n_couples):
         parts = lines[i].split("\t")
@@ -85,7 +85,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
             parts += ["0"] * (12 - len(parts))
 
         cid = _to_int(parts[0], None_is_0=True)
-        couple = Couple(
+        couple = Couple_ftt(
             id=cid,
             divorce=_to_int(parts[1], None_is_0=True),
             male_id=_to_int(parts[2]),
@@ -106,8 +106,8 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person], Dict[int, Couple]]:
 # ---------------------------
 # Index builders for GEDCOM
 # ---------------------------
-def build_indexes(people_by_id: Dict[int, Person],
-                  couples_by_id: Dict[int, Couple]):
+def build_indexes(people_by_id: Dict[int, Person_ftt],
+                  couples_by_id: Dict[int, Couple_ftt]):
     children_of_couple: Dict[int, List[int]] = {cid: [] for cid in couples_by_id}
     for p in people_by_id.values():
         if p.parent_couple_id and p.parent_couple_id in couples_by_id:
@@ -146,8 +146,8 @@ def sex_to_ged(sex_code: int) -> str:
 # ---------------------------
 # GEDCOM export
 # ---------------------------
-def to_gedcom(people_by_id: Dict[int, Person],
-              couples_by_id: Dict[int, Couple],
+def to_gedcom(people_by_id: Dict[int, Person_ftt],
+              couples_by_id: Dict[int, Couple_ftt],
               out_path: str = "output.ged",
               source_name: str = "FTZ2GED",
               lang: str = "English"):
@@ -327,8 +327,8 @@ def convert(file: str, output_file: str):
                 break
 
     # node.ftt summary + parsing
-    people_by_id: Dict[int, Person] = {}
-    couples_by_id: Dict[int, Couple] = {}
+    people_by_id: Dict[int, Person_ftt] = {}
+    couples_by_id: Dict[int, Couple_ftt] = {}
 
     if node_file:
         print("Found node.ftt")
