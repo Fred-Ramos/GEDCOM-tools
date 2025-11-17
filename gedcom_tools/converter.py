@@ -4,8 +4,8 @@ from typing import Optional, Dict, List, Tuple
 from datetime import datetime
 
 from .models import (
-    Person_ftt,
-    Couple_ftt
+    Person_FTT,
+    Couple_FTT
 )
 
 from .utils import (
@@ -16,7 +16,7 @@ from .utils import (
 # -----------------------------
 # Parsing .ftt file information
 # -----------------------------
-def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_ftt]]:
+def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_FTT], Dict[int, Couple_FTT]]:
     """
     Parse a str from a .ftt file
     Expected layout: TSV (tab-separated values).
@@ -27,7 +27,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_f
       16:birth_event 17:birth_year 18:birth_month 19:birth_day
       20:death_event 21:death_year 22:death_month 23:death_day
       24:sex 25:addition 26:note 27:tab_unk3 28:tab_unk4
-    Couple_ftts lines (tab-delimited) with your existing mapping.
+    Couple_FTTs lines (tab-delimited) with your existing mapping.
     """
     lines = [ln for ln in text.splitlines() if ln.strip()]
     if not lines:
@@ -38,8 +38,8 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_f
     n_people = int(hdr_parts[0].lstrip("\ufeff"))
     n_couples = int(hdr_parts[1])
 
-    people_by_id: Dict[int, Person_ftt] = {}
-    couples_by_id: Dict[int, Couple_ftt] = {}
+    people_by_id: Dict[int, Person_FTT] = {}
+    couples_by_id: Dict[int, Couple_FTT] = {}
 
     # People: lines[1 : 1 + n_people]
     for i in range(1, 1 + n_people):
@@ -48,7 +48,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_f
             parts += [""] * (29 - len(parts))
 
         pid = _to_int(parts[0], None_is_0=True)
-        person = Person_ftt(
+        person = Person_FTT(
             id=pid,
             reserved=_to_int(parts[1], None_is_0=True),
             parent_couple_id=_to_int(parts[2]),
@@ -81,7 +81,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_f
         )
         people_by_id[person.id] = person
 
-    # Couple_ftts
+    # Couple_FTTs
     start_couples = 1 + n_people
     for i in range(start_couples, start_couples + n_couples):
         parts = lines[i].split("\t")
@@ -89,7 +89,7 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_f
             parts += ["0"] * (12 - len(parts))
 
         cid = _to_int(parts[0], None_is_0=True)
-        couple = Couple_ftt(
+        couple = Couple_FTT(
             id=cid,
             divorce=_to_int(parts[1], None_is_0=True),
             male_id=_to_int(parts[2]),
@@ -110,8 +110,8 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_ftt], Dict[int, Couple_f
 # ---------------------------
 # Index builders for GEDCOM
 # ---------------------------
-def build_indexes(people_by_id: Dict[int, Person_ftt],
-                  couples_by_id: Dict[int, Couple_ftt]):
+def build_indexes(people_by_id: Dict[int, Person_FTT],
+                  couples_by_id: Dict[int, Couple_FTT]):
     children_of_couple: Dict[int, List[int]] = {cid: [] for cid in couples_by_id}
     for p in people_by_id.values():
         if p.parent_couple_id and p.parent_couple_id in couples_by_id:
@@ -150,8 +150,8 @@ def sex_to_ged(sex_code: int) -> str:
 # ---------------------------
 # GEDCOM export
 # ---------------------------
-def to_gedcom(people_by_id: Dict[int, Person_ftt],
-              couples_by_id: Dict[int, Couple_ftt],
+def to_gedcom(people_by_id: Dict[int, Person_FTT],
+              couples_by_id: Dict[int, Couple_FTT],
               out_path: str = "output.ged",
               source_name: str = "FTZ2GED",
               lang: str = "English"):
@@ -270,14 +270,6 @@ def to_gedcom(people_by_id: Dict[int, Person_ftt],
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
-    # Debug preview
-    print("\n===== GEDCOM preview =====")
-    for ln in lines[:80]:
-        print(ln)
-    if len(lines) > 80:
-        print("... (truncated)")
-    print("===== end GEDCOM preview =====\n")
-
     print(f"GEDCOM written to: {out_path}")
 
 # ---------------------------
@@ -293,10 +285,10 @@ def convert(file: str, output_file: str):
 
     print(f"Processing {file} ...")
     with zipfile.ZipFile(file, 'r') as archive:
-        all_files = archive.namelist()
+        files = archive.namelist()
 
         # Detect top-level folder (first part before '/')
-        top_folders = {name.split("/")[0] for name in all_files if "/" in name}
+        top_folders = {name.split("/")[0] for name in files if "/" in name}
         if not top_folders:
             print("⚠️ No folder structure found inside the archive.")
             return faces_images, node_file
@@ -307,11 +299,11 @@ def convert(file: str, output_file: str):
         # Support both "faces/" and "face/"
         faces_prefixes = [f"{folder_name}/faces/", f"{folder_name}/face/"]
         has_faces_folder = any(
-            any(name.startswith(prefix) for name in all_files) for prefix in faces_prefixes
+            any(name.startswith(prefix) for name in files) for prefix in faces_prefixes
         )
 
         if has_faces_folder:
-            for name in all_files:
+            for name in files:
                 if any(name.startswith(prefix) for prefix in faces_prefixes) and name.lower().endswith(".jpg"):
                     with archive.open(name) as f:
                         faces_images.append((name, BytesIO(f.read())))
@@ -324,15 +316,15 @@ def convert(file: str, output_file: str):
             print("No faces folder available.")
 
         # Collect node.ftt (mandatory)
-        for name in all_files:
+        for name in files:
             if name == f"{folder_name}/node.ftt":
                 with archive.open(name) as f:
                     node_file = (name, f.read())
                 break
 
     # node.ftt summary + parsing
-    people_by_id: Dict[int, Person_ftt] = {}
-    couples_by_id: Dict[int, Couple_ftt] = {}
+    people_by_id: Dict[int, Person_FTT] = {}
+    couples_by_id: Dict[int, Couple_FTT] = {}
 
     if node_file:
         print("Found node.ftt")

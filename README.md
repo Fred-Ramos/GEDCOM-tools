@@ -16,3 +16,5 @@
    ```
 
 ## Usage
+
+IMAGES DETECTED BUT NOT BEING USED FOR NOW

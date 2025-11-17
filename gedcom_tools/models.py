@@ -4,7 +4,7 @@ from typing import Optional
 # Data models
 # ---------------------------
 @dataclass
-class Person_ftt:
+class Person_FTT:
     id: int
     reserved: int
     parent_couple_id: Optional[int]
@@ -39,7 +39,7 @@ class Person_ftt:
     tab_unk4: Optional[str] = None
 
 @dataclass
-class Couple_ftt:
+class Couple_FTT:
     id: int
     divorce: int  # 0=No, 1=Yes
     male_id: Optional[int]
