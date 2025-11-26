@@ -75,9 +75,9 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_FTT], Dict[int, Couple_F
             death_day=_to_int(parts[23]),
             sex=_to_int(parts[24], None_is_0=True),
             addition=(parts[25].strip() or None),
-            note=(parts[26].strip() or None),
-            tab_unk3=parts[27],
-            tab_unk4=parts[28],
+            tab_unk3=parts[26],
+            tab_unk4=parts[27],
+            note=(parts[28].strip() or None),
         )
         people_by_id[person.id] = person
 
@@ -332,8 +332,8 @@ def convert(file: str, output_file: str):
             text = node_file[1].decode("utf-8-sig")
             print("\n===== node.ftt contents =====")
             print(text)
-            print("===== end of node.ftt =====\n")
 
+            print("===== end of node.ftt =====\n")
             # Parse into structures
             people_by_id, couples_by_id = parse_node_ftt(text)
 
