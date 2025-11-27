@@ -1,6 +1,9 @@
-# familytree files
-*.ftz
-*.ged
+.env
+venv/
 
 # Pycache
 __pycache__/
+
+# Familytree files
+*.ftz
+*.ged
