@@ -1,1 +1,51 @@
-Return ONLY the modified GEDCOM file with no explanations or additional text. Extract missing date/place information from Portuguese NOTES and add PLAC/DATE fields under BIRT, DEAT, BURI, BAPM, or EVEN Marriage. If nationality is mentioned (like "português", "brasileiro") and no birth place is found, use that as birth place. Follow GEDCOM format exactly: for events add "2 DATE" and "2 PLAC" lines under the existing event entries. Do not add any text before or after the GEDCOM content.
+Extract information from Portuguese NOTES in JSON GEDCOM and add missing event objects.
+
+FROM NOTE FIELD:
+- Find birth info → add "BIRT": {"DATE": "...", "PLAC": "..."}
+- Find death info → add "DEAT": {"DATE": "...", "PLAC": "..."}
+- Find baptism info → add "BAPM": {"DATE": "...", "PLAC": "..."}
+- Find burial info → add "BURI": {"DATE": "...", "PLAC": "..."}
+- Find occupation → add "OCCU": "..."
+
+EXTRACTION RULES:
+1. BIRTH PLACE KEYWORDS: "Natural de", "nasceu em", "nascido em", "nascida em", "origem", "de", "nascimento em"
+   - Example: "Natural de São Ildefonso, Porto" → BIRT with PLAC: "São Ildefonso, Porto"
+   - Example: "de Lisboa" → BIRT with PLAC: "Lisboa"
+
+2. PORTUGUESE KEYWORDS:
+   - Birth: "nasceu", "nascido", "nascimento", "nascida", "Natural de"
+   - Death: "morreu", "faleceu", "óbito", "morto", "morte", "falecimento"
+   - Baptism: "batizado", "batizada", "batismo", "batismo em"
+   - Burial: "enterrado", "enterrada", "sepultado", "sepultamento", "funeral", "cemitério"
+   - Occupation: "era", "trabalhava", "profissão", "ocupação", "militar", "soldado", "exército", "carpinteiro", etc.
+
+3. DATE FORMAT: Convert to English months: "12 agosto 1990" → "12 August 1990"
+   - Also handle: "14/07/1919" → "14 July 1919"
+   - "dia 3 de maio" → "3 May"
+
+4. NATIONALITY AS BIRTH PLACE:
+   - If "brasileiro" or "Brasileiro" → Add BIRT with PLAC: "Brazil" (if no BIRT exists)
+   - If "português" or "Portuguesa" → Add BIRT with PLAC: "Portugal" (if no BIRT exists)
+   - If both nationality and specific place: use specific place
+
+5. CLEAN NOTE: Remove extracted information from NOTE field. If NOTE becomes empty, delete NOTE field entirely.
+
+IMPORTANT: Always check if event field already exists before adding. Only add if missing.
+
+CRITICAL: Return ONLY the JSON array, no explanations, no markdown code blocks, no additional text. Start with [ and end with ].
+
+EXAMPLES:
+1. Input: {"NOTE": "Natural de São Ildefonso, Porto"}
+   Output: {"BIRT": {"PLAC": "São Ildefonso, Porto"}} (NOTE removed)
+
+2. Input: {"NOTE": "Brasileiro, nasceu em 12 agosto 1990"}
+   Output: {"BIRT": {"DATE": "12 August 1990", "PLAC": "Brazil"}} (NOTE removed)
+
+3. Input: {"NOTE": "Natural de Lisboa, era carpinteiro"}
+   Output: {"BIRT": {"PLAC": "Lisboa"}, "OCCU": "carpinteiro"} (NOTE removed)
+
+4. Input: {"NOTE": "Batizado a 14/07/1919 em São Baptista, Rio de Janeiro"}
+   Output: {"BAPM": {"DATE": "14 July 1919", "PLAC": "São Baptista, Rio de Janeiro"}} (NOTE removed)
+
+5. Input: {"NOTE": "Faleceu em Belo Horizonte, casado"}
+   Output: {"DEAT": {"PLAC": "Belo Horizonte"}} (NOTE: "casado")

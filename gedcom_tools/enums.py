@@ -15,6 +15,8 @@ class Tags:
     CONTINUE = "CONT"         # Continued indicator
     DATE = "DATE"             # Time of an event in calendar format
     DEATH = "DEAT"            # Event when mortal life terminates
+    BAPTISM = "BAPM"          # Event of baptism performed in infancy or later
+    CAUSE = "CAUS"            # The reasons which precipitated an event. It is often used subordinate to a death
 
     # Family / structure
     FAMILY = "FAM"            # Family relationship

@@ -367,7 +367,7 @@ def json_to_gedcom(data: dict) -> str:
 # ---------------------------
 # Main convert flow
 # ---------------------------
-def convert(file: str, output_file: str):
+def convert(file: str, output_name: str):
     faces_images: List[Tuple[str, BytesIO]] = []   # list of (filename, BytesIO)
     node_file: Optional[Tuple[str, bytes]] = None  # (filename, bytes)
 
@@ -422,46 +422,25 @@ def convert(file: str, output_file: str):
         print("Found node.ftt")
         try:
             text = node_file[1].decode("utf-8-sig")
-            print("\n===== node.ftt contents =====")
-            print(text)
-            print("===== end of node.ftt =====\n")
             # Parse into structures
             people_by_id, couples_by_id = parse_node_ftt(text)
 
-            # # Debug: print each person
-            # print("=== PEOPLE (parsed) ===")
-            # for p in people_by_id.values():
-            #     print(
-            #         f"Person {p.id}: {p.surname}, {p.name} | "
-            #         f"Birth: {p.birth_year}-{p.birth_month}-{p.birth_day} (ev={p.birth_event}) | "
-            #         f"Death: {p.death_year}-{p.death_month}-{p.death_day} (ev={p.death_event}) | "
-            #         f"Sex={p.sex} | ParentCouple={p.parent_couple_id} | "
-            #         f"Addition={p.addition} | Note={p.note}"
-            #     )
-
-            # # Debug: print each couple
-            # print("\n=== COUPLES (parsed) ===")
-            # for c in couples_by_id.values():
-            #     print(
-            #         f"Couple {c.id}: divorce={c.divorce} | male={c.male_id} | female={c.female_id}"
-            #     )
-
-            # Export GEDCOM
+            # Generate JSON
             gedcom_json = to_json(people_by_id, couples_by_id,
                       lang="English")
-
+            json_name = output_name + ".json"
             # Write JSON file
-            with open(output_file + ".json", "w", encoding="utf-8") as f:
+            with open(json_name, "w", encoding="utf-8") as f:
                 json.dump(gedcom_json, f, indent=2)
+            print(f"JSON written to: {json_name}")
 
-            print(f"JSON written to: {output_file + '.json'}")
-
+            # Convert to GEDCOM
             gedcom = json_to_gedcom(gedcom_json)
-
-            # Write JSON file
-            with open(output_file, "w", encoding="utf-8") as f:
+            gedcom_name = output_name + ".ged"
+            # Write GEDCOM file
+            with open(gedcom_name, "w", encoding="utf-8") as f:
                 f.write(gedcom)
-            print(f"GEDCOM written to: {output_file}")
+            print(f"GEDCOM written to: {gedcom_name}")
 
 
             return
@@ -472,5 +451,5 @@ def convert(file: str, output_file: str):
 
     return None
 
-def process_ftz(file: str, output_file: str):
-    convert(file, output_file)
+def process_ftz(file: str, output_name: str):
+    convert(file, output_name)
