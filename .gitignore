@@ -7,3 +7,4 @@ __pycache__/
 # Familytree files
 *.ftz
 *.ged
+*.json

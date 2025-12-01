@@ -1,0 +1,46 @@
+class Tags:
+    """GEDCOM tags used in the application"""
+    _MREL = "_MREL"  # Relationship to a mother
+    _FREL = "_FREL"  # Relationship to a father
+    BIRT = "BIRT"  # The event of entering into life
+    BURI = "BURI"  # The event of proper disposing of remains
+    CENS = "CENS"  # Census event
+    CHAN = "CHAN"  # Indicates a change, correction, or modification
+    CHIL = "CHIL"  # Child of a father and mother
+    CONC = "CONC"  # Concatenation indicator
+    CONT = "CONT"  # Continued indicator
+    DATE = "DATE"  # Time of an event in calendar format
+    DEAT = "DEAT"  # Event when mortal life terminates
+    FAM = "FAM"  # Family relationship
+    FAMC = "FAMC"  # Family in which individual appears as child
+    FAMS = "FAMS"  # Family in which individual appears as spouse
+    FILE = "FILE"  # Information storage place
+    GIVN = "GIVN"  # Given or earned name
+    HUSB = "HUSB"  # Individual in role of married man or father
+    INDI = "INDI"  # A person
+    MARR = "MARR"  # Event of creating a family unit
+    NAME = "NAME"  # Name used to identify individual
+    OBJE = "OBJE"  # Multimedia object
+    OCCU = "OCCU"  # Type of work or profession
+    PLAC = "PLAC"  # Jurisdictional name for place/location
+    PRIV = "PRIV"  # Flag for private address or event
+    SEX = "SEX"  # Sex of an individual
+    SOUR = "SOUR"  # Source material
+    SURN = "SURN"  # Family name
+    WIFE = "WIFE"  # Individual in role as mother/married woman
+    HEAD = "HEAD"  # Header record
+    GEDC = "GEDC"  # GEDCOM version information
+    VERS = "VERS"  # Version
+    FORM = "FORM"  # Form
+    CHAR = "CHAR"  # Character set
+    LANG = "LANG"  # Language
+    SUBM = "SUBM"  # Submitter
+    TRLR = "TRLR"  # Trailer record
+    NOTE = "NOTE"  # Note
+    PEDI = "PEDI"  # Pedigree
+    DIV = "DIV"  # Divorce
+    TIME = "TIME"  # Time
+
+    _NAME = "_NAME"  # When naming a element (custom tag)
+    _PREF = "_PREF"  # Pointer Reference (custom tag)
+    _PDEF = "_PDEF"  # Pointer Definition (custom tag)
