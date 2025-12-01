@@ -174,26 +174,26 @@ def to_json(people_by_id: Dict[int, Person_FTT],
     head_time = now.strftime("%H:%M:%S")
 
     # HEAD block --------------------------------------------
-    DOCUMENT[T.HEAD] = {
-        T.GEDC: {
-            T.VERS: "5.5.1",
+    DOCUMENT[T.HEADER] = {
+        T.GEDCOM: {
+            T.VERSION: "5.5.1",
             T.FORM: "LINEAGE-LINKED",
         },
-        T.CHAR: "UTF-8",
-        T.SOUR: {
+        T.CHARSET: "UTF-8",
+        T.SOURCE: {
             T._NAME: "GT",
             T.NAME: "Gedcom Tools",
-            T.VERS: __version__,
+            T.VERSION: __version__,
         },
         T.DATE: {
             T._NAME: head_date,
             T.TIME: head_time,
         },
-        T.LANG: lang,
-        T.SUBM: "@U1@",
+        T.LANGUAGE: lang,
+        T.SUBMITTER: "@U1@",
     }
     # Submitter definition
-    DOCUMENT[T.SUBM] = {
+    DOCUMENT[T.SUBMITTER] = {
         T._PDEF: "@U1@",
         T.NAME: "Tester"
     }
@@ -202,8 +202,8 @@ def to_json(people_by_id: Dict[int, Person_FTT],
     level_stack = [DOCUMENT]
 
     # Start LISTS for INDI and FAM
-    DOCUMENT[T.INDI] = []
-    DOCUMENT[T.FAM] = []
+    DOCUMENT[T.INDIVIDUAL] = []
+    DOCUMENT[T.FAMILY] = []
 
     # Create sorted id lists
     person_ids = sorted(people_by_id.keys())
@@ -222,23 +222,23 @@ def to_json(people_by_id: Dict[int, Person_FTT],
             T._PDEF: indi_ptr[person_id],
             T.NAME: {
                 T._NAME: f"{p.name} /{p.surname}/",
-                T.GIVN: p.name,
-                T.SURN: p.surname
+                T.GIVEN: p.name,
+                T.SURNAME: p.surname
             },
             T.SEX: sex_to_ged(p.sex),
-            T.FAMC: [],
-            T.FAMS: []
+            T.FAMILY_AS_CHILD: [],
+            T.FAMILY_AS_SPOUSE: []
         }
 
         # Birth
         bdate = fmt_ged_date(p.birth_year, p.birth_month, p.birth_day)
         if p.birth_event and bdate:
-            node[T.BIRT] = {T.DATE: bdate}
+            node[T.BIRTH] = {T.DATE: bdate}
 
         # Death
         ddate = fmt_ged_date(p.death_year, p.death_month, p.death_day)
         if p.death_event and (ddate or p.death_event == 128):
-            node[T.DEAT] = {T.DATE: ddate} if ddate else "Y"
+            node[T.DEATH] = {T.DATE: ddate} if ddate else "Y"
 
         # Family as a child
         if p.parent_couple_id and p.parent_couple_id in fam_ptr:
@@ -246,21 +246,21 @@ def to_json(people_by_id: Dict[int, Person_FTT],
                 T._PREF: fam_ptr[p.parent_couple_id],
                 "PEDI": "BIRTH"
             }
-            node[T.FAMC].append(subnode)
+            node[T.FAMILY_AS_CHILD].append(subnode)
 
         # Family as spouse
         for couple_id in couples_of_person.get(person_id, []):
             subnode = {
                 T._PREF: fam_ptr[couple_id],
             }
-            node[T.FAMS].append(subnode)
+            node[T.FAMILY_AS_SPOUSE].append(subnode)
 
         # Notes
         note_text = p.note or p.addition
         if note_text:
             node[T.NOTE] = note_text
 
-        DOCUMENT[T.INDI].append(node)
+        DOCUMENT[T.INDIVIDUAL].append(node)
     
     # FAM records -------------------------------------------
     for couple_id in couple_ids:
@@ -271,18 +271,18 @@ def to_json(people_by_id: Dict[int, Person_FTT],
         }
 
         if c.male_id and c.male_id in indi_ptr:
-            node[T.HUSB] = indi_ptr[c.male_id]
+            node[T.HUSBAND] = indi_ptr[c.male_id]
         if c.female_id and c.female_id in indi_ptr:
             node[T.WIFE] = indi_ptr[c.female_id]
 
         kids = children_of_couple.get(couple_id, [])
         if kids:
-            node[T.CHIL] = [indi_ptr[p] for p in kids]
+            node[T.CHILD] = [indi_ptr[p] for p in kids]
 
         if c.divorce == 1:
-            node[T.DIV] = "Y"
+            node[T.DIVORCE] = "Y"
 
-        DOCUMENT[T.FAM].append(node)
+        DOCUMENT[T.FAMILY].append(node)
 
     # Trailer block --------------------------------------------
     DOCUMENT["TRLR"] = {}
