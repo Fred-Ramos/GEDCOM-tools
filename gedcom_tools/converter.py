@@ -3,6 +3,9 @@ from io import BytesIO
 from typing import Optional, Dict, List, Tuple
 from datetime import datetime
 
+# GEDCOM tools
+from . import __version__
+
 from .models import (
     Person_FTT,
     Couple_FTT
@@ -12,6 +15,11 @@ from .utils import (
     _to_int,
     _to_float,
 )
+
+# PYTHON-GEDCOM
+import gedcom.tags as T
+
+from gedcom.parser import Parser
 
 # -----------------------------
 # Parsing .ftt file information
@@ -42,7 +50,8 @@ def parse_node_ftt(text: str) -> Tuple[Dict[int, Person_FTT], Dict[int, Couple_F
     couples_by_id: Dict[int, Couple_FTT] = {}
 
     # People: lines[1 : 1 + n_people]
-    for i in range(1, 1 + n_people):
+    start_person = 1
+    for i in range(start_person, start_person + n_people):
         parts = lines[i].split("\t")
         if len(parts) < 29:
             parts += [""] * (29 - len(parts))
@@ -128,8 +137,8 @@ def build_indexes(people_by_id: Dict[int, Person_FTT],
 # ---------------------------
 # GEDCOM formatting
 # ---------------------------
-GED_MONTHS = [None, "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-              "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+GED_MONTHS = [None, "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 def fmt_ged_date(y, m, d) -> Optional[str]:
     """Return GEDCOM-compliant date with available granularity."""
@@ -153,8 +162,7 @@ def sex_to_ged(sex_code: int) -> str:
 def to_gedcom(people_by_id: Dict[int, Person_FTT],
               couples_by_id: Dict[int, Couple_FTT],
               out_path: str = "output.ged",
-              source_name: str = "FTZ2GED",
-              lang: str = "English"):
+              lang: str = "en"):
     """Generate a GEDCOM 5.5.1 file from parsed people/couples."""
     person_ids = sorted(people_by_id.keys())
     couple_ids = sorted(couples_by_id.keys())
@@ -166,109 +174,108 @@ def to_gedcom(people_by_id: Dict[int, Person_FTT],
     # Indexes
     children_of_couple, couples_of_person = build_indexes(people_by_id, couples_by_id)
 
-    now = datetime.now()
-    head_date = now.strftime("%d %b %Y").upper()     # e.g., "13 SEP 2025"
-    head_time = now.strftime("%H:%M:%S")
-
     lines: List[str] = []
 
     # HEAD
-    lines += [
+    now = datetime.now()
+    head_date = now.strftime("%d %b %Y").upper()
+    head_time = now.strftime("%H:%M:%S")
+    head = [
         "0 HEAD",
-        f"1 SOUR {source_name}",
-        "2 VERS 1.0",
-        f"1 DATE {head_date}",
-        f"2 TIME {head_time}",
-        "1 SUBM @SUBM@",
         "1 GEDC",
         "2 VERS 5.5.1",
         "2 FORM LINEAGE-LINKED",
         "1 CHAR UTF-8",
+        f"1 SOUR {__package__}",
+        f"2 VERS {__version__}",
+        f"1 DATE {head_date}",
+        f"2 TIME {head_time}",
         f"1 LANG {lang}",
+        "1 SUBM @U1@",  # SUBMITER is foreign key U1
+        "0 @U1@ SUBM",   # Definition of U1
+        "1 NAME Tester"
     ]
 
-    # Minimal SUBM
-    lines += [
-        "0 @SUBM@ SUBM",
-        "1 NAME",
-    ]
+    record: List[str] = []
 
     # INDI records
     for pid in person_ids:
         p = people_by_id[pid]
         ptr = indi_ptr[pid]
         full_name = f"{p.name} /{p.surname}/".strip()
-        lines.append(f"0 {ptr} INDI")
-        lines.append(f"1 NAME {full_name}")
-        lines.append("2 TYPE birth")
+        record.append(f"0 {ptr} INDI")
+        record.append(f"1 NAME {full_name}")
+        record.append("2 TYPE birth")
         if p.name:
-            lines.append(f"2 GIVN {p.name}")
+            record.append(f"2 GIVN {p.name}")
         if p.surname:
-            lines.append(f"2 SURN {p.surname}")
-        lines.append(f"1 SEX {sex_to_ged(p.sex)}")
+            record.append(f"2 SURN {p.surname}")
+        record.append(f"1 SEX {sex_to_ged(p.sex)}")
 
         # Birth
         bdate = fmt_ged_date(p.birth_year, p.birth_month, p.birth_day)
         if p.birth_event and bdate:
-            lines.append("1 BIRT")
-            lines.append(f"2 DATE {bdate}")
+            record.append("1 BIRT")
+            record.append(f"2 DATE {bdate}")
 
         # Death
         ddate = fmt_ged_date(p.death_year, p.death_month, p.death_day)
         # Emit DEAT if we have a date OR death_event indicates a death (128) even without date
         if p.death_event and (ddate or p.death_event == 128):
-            lines.append("1 DEAT" + ("" if ddate else " Y"))
+            record.append("1 DEAT" + ("" if ddate else " Y"))
             if ddate:
-                lines.append(f"2 DATE {ddate}")
+                record.append(f"2 DATE {ddate}")
 
         # FAMC (parents family)
         if p.parent_couple_id and p.parent_couple_id in fam_ptr:
-            lines.append(f"1 FAMC {fam_ptr[p.parent_couple_id]}")
-            lines.append("2 PEDI birth")
+            record.append(f"1 FAMC {fam_ptr[p.parent_couple_id]}")
+            record.append("2 PEDI birth")
 
         # FAMS (spouse in families)
         for cid in couples_of_person.get(pid, []):
-            lines.append(f"1 FAMS {fam_ptr[cid]}")
+            record.append(f"1 FAMS {fam_ptr[cid]}")
 
         # Inline NOTE
         note_text = p.note or p.addition
         if note_text:
-            lines.append(f"1 NOTE {note_text}")
+            record.append(f"1 NOTE {note_text}")
 
         # CHAN
-        lines.append("1 CHAN")
-        lines.append(f"2 DATE {head_date}")
-        lines.append(f"3 TIME {head_time}")
+        record.append("1 CHAN")
+        record.append(f"2 DATE {head_date}")
+        record.append(f"3 TIME {head_time}")
 
     # FAM records
     for cid in couple_ids:
         c = couples_by_id[cid]
         fptr = fam_ptr[cid]
-        lines.append(f"0 {fptr} FAM")
+        record.append(f"0 {fptr} FAM")
         if c.male_id and c.male_id in indi_ptr:
-            lines.append(f"1 HUSB {indi_ptr[c.male_id]}")
+            record.append(f"1 HUSB {indi_ptr[c.male_id]}")
         if c.female_id and c.female_id in indi_ptr:
-            lines.append(f"1 WIFE {indi_ptr[c.female_id]}")
+            record.append(f"1 WIFE {indi_ptr[c.female_id]}")
 
         # Children
         for child_pid in children_of_couple.get(cid, []):
-            lines.append(f"1 CHIL {indi_ptr[child_pid]}")
+            record.append(f"1 CHIL {indi_ptr[child_pid]}")
 
         # Divorce
         if c.divorce == 1:
-            lines.append("1 DIV Y")
+            record.append("1 DIV Y")
 
         # CHAN
-        lines.append("1 CHAN")
-        lines.append(f"2 DATE {head_date}")
-        lines.append(f"3 TIME {head_time}")
+        record.append("1 CHAN")
+        record.append(f"2 DATE {head_date}")
+        record.append(f"3 TIME {head_time}")
 
     # Trailer
-    lines.append("0 TRLR")
+    trlr = ["0 TRLR"]
+    
+    doc = head + record + trlr
 
     # Write file
     with open(out_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+        f.write("\n".join(doc) + "\n")
 
     print(f"GEDCOM written to: {out_path}")
 
@@ -281,8 +288,8 @@ def convert(file: str, output_file: str):
 
     if not file.lower().endswith(".ftz"):
         print("Not an .ftz file. Exiting.")
-        return faces_images, node_file
-
+        return None
+    
     print(f"Processing {file} ...")
     with zipfile.ZipFile(file, 'r') as archive:
         files = archive.namelist()
@@ -291,7 +298,7 @@ def convert(file: str, output_file: str):
         top_folders = {name.split("/")[0] for name in files if "/" in name}
         if not top_folders:
             print("⚠️ No folder structure found inside the archive.")
-            return faces_images, node_file
+            return None
 
         folder_name = top_folders.pop()  # assume only one root
         print(f"Found Family Tree: {folder_name}")
@@ -330,10 +337,9 @@ def convert(file: str, output_file: str):
         print("Found node.ftt")
         try:
             text = node_file[1].decode("utf-8-sig")
-            print("\n===== node.ftt contents =====")
-            print(text)
-
-            print("===== end of node.ftt =====\n")
+            # print("\n===== node.ftt contents =====")
+            # print(text)
+            # print("===== end of node.ftt =====\n")
             # Parse into structures
             people_by_id, couples_by_id = parse_node_ftt(text)
 
@@ -356,12 +362,17 @@ def convert(file: str, output_file: str):
                 )
 
             # Export GEDCOM
-            to_gedcom(people_by_id, couples_by_id, out_path=output_file,
-                      source_name="FTZ2GED", lang="English")
+            text = to_gedcom(people_by_id, couples_by_id, out_path=output_file,
+                      lang="English")
 
+            return text
         except UnicodeDecodeError:
             print("⚠️ node.ftt is not valid UTF-8 text.")
     else:
         print("⚠️ node.ftt not found!")
 
-    return faces_images, node_file
+    return None
+
+def process_ftz(file: str, output_file: str):
+    print(__package__)
+    convert(file, output_file)
