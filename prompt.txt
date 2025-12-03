@@ -18,9 +18,13 @@ EXTRACTION RULES:
    - Burial: "enterrado", "enterrada", "sepultado", "sepultamento", "funeral", "cemitério"
    - Occupation: "era", "trabalhava", "profissão", "ocupação", "militar", "soldado", "exército", "carpinteiro", etc.
 
-3. DATE FORMAT: Convert to English months: "12 agosto 1990" → "12 August 1990"
-   - Also handle: "14/07/1919" → "14 July 1919"
-   - "dia 3 de maio" → "3 May"
+3. DATE FORMAT: Convert to 3-letter English month abbreviation:
+   - "12 agosto 1990" → "12 Aug 1990"
+   - "14/07/1919" → "14 Jul 1919"
+   - "dia 3 de maio de 1980" → "3 May 1980"
+   - "7 de agosto de 1980" → "7 Aug 1980"
+   - Month abbreviations: Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
+   - If writing before DATE, write BEF DATE
 
 4. NATIONALITY AS BIRTH PLACE:
    - If "brasileiro" or "Brasileiro" → Add BIRT with PLAC: "Brazil" (if no BIRT exists)
@@ -37,16 +41,16 @@ EXAMPLES:
 1. Input: {"_PDEF": "@I0001@", "NAME": {"_NAME": "Vicente"}, "NOTE": "Natural de São Ildefonso, Porto"}
    Output: {"_PDEF": "@I0001@", "NAME": {"_NAME": "Vicente"}, "BIRT": {"PLAC": "São Ildefonso, Porto"}} (NOTE removed)
 
-2. Input: {"_PDEF": "@I0002@", "NAME": {"_NAME": "João"}, "NOTE": "Brasileiro, nasceu em 12 agosto 1990"}
-   Output: {"_PDEF": "@I0002@", "NAME": {"_NAME": "João"}, "BIRT": {"DATE": "12 August 1990", "PLAC": "Brazil"}} (NOTE removed)
+2. Input: {"_PDEF": "@I0002@", "NAME": {"_NAME": "João"}, "NOTE": "Brasileiro, nasceu em 7 de agosto de 1980"}
+   Output: {"_PDEF": "@I0002@", "NAME": {"_NAME": "João"}, "BIRT": {"DATE": "7 Aug 1980", "PLAC": "Brazil"}} (NOTE removed)
 
 3. Input: {"_PDEF": "@I0003@", "NAME": {"_NAME": "Maria"}, "NOTE": "Natural de Lisboa, era carpinteiro"}
    Output: {"_PDEF": "@I0003@", "NAME": {"_NAME": "Maria"}, "BIRT": {"PLAC": "Lisboa"}, "OCCU": "carpinteiro"} (NOTE removed)
 
 4. Input: {"_PDEF": "@I0004@", "NAME": {"_NAME": "Pedro"}, "NOTE": "Batizado a 14/07/1919 em São Baptista, Rio de Janeiro"}
-   Output: {"_PDEF": "@I0004@", "NAME": {"_NAME": "Pedro"}, "BAPM": {"DATE": "14 July 1919", "PLAC": "São Baptista, Rio de Janeiro"}} (NOTE removed)
+   Output: {"_PDEF": "@I0004@", "NAME": {"_NAME": "Pedro"}, "BAPM": {"DATE": "14 Jul 1919", "PLAC": "São Baptista, Rio de Janeiro"}} (NOTE removed)
 
-5. Input: {"_PDEF": "@I0005@", "NAME": {"_NAME": "Ana"}, "NOTE": "Faleceu em Belo Horizonte, casado"}
-   Output: {"_PDEF": "@I0005@", "NAME": {"_NAME": "Ana"}, "DEAT": {"PLAC": "Belo Horizonte"}, "NOTE": "casado"}
+5. Input: {"_PDEF": "@I0005@", "NAME": {"_NAME": "Ana"}, "NOTE": "Faleceu em 12 março 1995 em Belo Horizonte, casado"}
+   Output: {"_PDEF": "@I0005@", "NAME": {"_NAME": "Ana"}, "DEAT": {"DATE": "12 Mar 1995", "PLAC": "Belo Horizonte"}, "NOTE": "casado"}
 
 FINAL INSTRUCTION: Return a JSON array of COMPLETE individual objects with their modifications. Start with [ and end with ].

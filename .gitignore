@@ -8,3 +8,6 @@ __pycache__/
 *.ftz
 *.ged
 *.json
+
+# Ignore any error_chunk_*.txt files
+error_chunk_*.txt
