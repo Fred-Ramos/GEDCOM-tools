@@ -4,54 +4,7 @@ import json
 import re
 from dotenv import load_dotenv
 
-def extract_json_from_response(text):
-    """Extract JSON array from AI response which might have markdown and text"""
-    # Try to parse directly first
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    
-    # Look for JSON array in markdown code blocks
-    json_pattern = r'```(?:json)?\s*(\[.*\])\s*```'
-    match = re.search(json_pattern, text, re.DOTALL)
-    
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-    
-    # Look for any JSON array in the text
-    json_pattern2 = r'(\[\s*\{.*\}\s*\])'
-    match = re.search(json_pattern2, text, re.DOTALL)
-    
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-    
-    # Last resort: try to find and parse the array manually
-    lines = text.split('\n')
-    json_lines = []
-    in_json = False
-    
-    for line in lines:
-        if line.strip().startswith('[') or line.strip().startswith('{'):
-            in_json = True
-        if in_json:
-            json_lines.append(line)
-        if line.strip().endswith(']') or line.strip().endswith('}'):
-            in_json = False
-    
-    if json_lines:
-        try:
-            return json.loads('\n'.join(json_lines))
-        except json.JSONDecodeError:
-            pass
-    
-    return None
+from gedcom_tools.converter import json_to_gedcom
 
 def chunk_individuals(individuals, chunk_size=5):
     """Group individuals into chunks of specified size"""
@@ -87,11 +40,11 @@ def process_json_file(json_file):
     
     individuals = data["INDI"]
     
-    chunks = chunk_individuals(individuals, 3)
+    chunks = chunk_individuals(individuals, 10)  # Adjust chunk size as needed
     
     print(f"Found {len(individuals)} individuals, processing in {len(chunks)} chunks")
     
-    modified_individuals = []
+    processed_individuals = []  # Initialize list to store processed individuals
     
     for i, chunk in enumerate(chunks):
         print(f"\n=== Processing chunk {i+1}/{len(chunks)} with {len(chunk)} individuals ===")
@@ -120,23 +73,24 @@ def process_json_file(json_file):
 
         if response.status_code == 200:
             result = response.json()
-            # print(f"Raw result: \n{result}\n")
             processed_text = result['choices'][0]['message']['content']
             
             # Print raw response for debugging
             print(f"Raw response:\n{processed_text}\n...")
             
-            # Extract JSON from response
-            processed_chunk = extract_json_from_response(processed_text)
-            
-            if processed_chunk and isinstance(processed_chunk, list):
-                modified_individuals.extend(processed_chunk)
-                print(f"✓ Success - parsed {len(processed_chunk)} individuals")
-            else:
+            # Since the response is already a JSON array, we can skip extraction
+            try:
+                processed_chunk = json.loads(processed_text)  # Directly parse the response
+                if isinstance(processed_chunk, list):
+                    processed_individuals.extend(processed_chunk)
+                    print(f"✓ Success - parsed {len(processed_chunk)} individuals")
+                else:
+                    print(f"✗ Invalid response format. Expected list, got {type(processed_chunk)}")
+                    processed_individuals.extend(chunk)  # Keep the original individuals if there's an issue
+            except json.JSONDecodeError:
                 print(f"✗ Failed to parse JSON from response")
-                print(f"Using original {len(chunk)} individuals")
-                modified_individuals.extend(chunk)
-                
+                processed_individuals.extend(chunk)  # Keep the original individuals in case of error
+
                 # Save problematic response for debugging
                 with open(f"error_chunk_{i+1}.txt", "w", encoding="utf-8") as f:
                     f.write(f"Request:\n{chunk_json}\n\nResponse:\n{processed_text}")
@@ -144,15 +98,14 @@ def process_json_file(json_file):
         else:
             print(f"✗ HTTP Error {response.status_code}")
             print(f"Response: {response.text[:200]}")
-            print(f"Using original {len(chunk)} individuals")
-            modified_individuals.extend(chunk)
+            processed_individuals.extend(chunk)  # Keep the original individuals
     
-    # Replace INDI array with modified individuals
-    data["INDI"] = modified_individuals
+    # Replace INDI array with processed individuals
+    data["INDI"] = processed_individuals
     
     # Print the modified individuals (on the way out)
     print("\n=== Modified Individuals (on the way out) ===")
-    print(json.dumps(modified_individuals, ensure_ascii=False, indent=2))
+    print(json.dumps(processed_individuals, ensure_ascii=False, indent=2))
     
     # Save output
     output_file = json_file.replace('.json', '_processed.json') if json_file.endswith('.json') else 'output.json'
@@ -160,8 +113,17 @@ def process_json_file(json_file):
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    print(f"\n✅ Done! Processed {len(modified_individuals)} individuals.")
+    print(f"\n✅ Done! Processed {len(processed_individuals)} individuals.")
     print(f"Saved to {output_file}")
+
+    # Convert to GEDCOM and save
+    gedcom_data = json_to_gedcom(data)  # Convert the processed JSON to GEDCOM format
+    
+    gedcom_file = output_file.replace('.json', '.ged')  # Create GEDCOM file name
+    with open(gedcom_file, 'w', encoding='utf-8') as f:
+        f.write(gedcom_data)  # Write the GEDCOM data to a file
+    
+    print(f"✅ GEDCOM file saved to {gedcom_file}")
 
 
 if __name__ == "__main__":
