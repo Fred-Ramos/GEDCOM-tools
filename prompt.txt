@@ -9,8 +9,7 @@ FROM NOTE FIELD:
 
 EXTRACTION RULES:
 1. BIRTH PLACE KEYWORDS: "Natural de", "nasceu em", "nascido em", "nascida em", "origem", "de", "nascimento em"
-   - Example: "Natural de São Ildefonso, Porto" → BIRT with PLAC: "São Ildefonso, Porto"
-   - Example: "de Lisboa" → BIRT with PLAC: "Lisboa"
+   - Example: "Natural de São Ildefonso, Porto" → Add BIRT with PLAC: "São Ildefonso, Porto"
 
 2. PORTUGUESE KEYWORDS:
    - Birth: "nasceu", "nascido", "nascimento", "nascida", "Natural de"
@@ -32,20 +31,22 @@ EXTRACTION RULES:
 
 IMPORTANT: Always check if event field already exists before adding. Only add if missing.
 
-CRITICAL: Return ONLY the JSON array, no explanations, no markdown code blocks, no additional text. Start with [ and end with ].
+CRITICAL: Return the COMPLETE modified individual objects in a JSON array. Each object must include ALL original fields plus any added BIRT/DEAT/BAPM/BURI/OCCU fields.
 
 EXAMPLES:
-1. Input: {"NOTE": "Natural de São Ildefonso, Porto"}
-   Output: {"BIRT": {"PLAC": "São Ildefonso, Porto"}} (NOTE removed)
+1. Input: {"_PDEF": "@I0001@", "NAME": {"_NAME": "Vicente"}, "NOTE": "Natural de São Ildefonso, Porto"}
+   Output: {"_PDEF": "@I0001@", "NAME": {"_NAME": "Vicente"}, "BIRT": {"PLAC": "São Ildefonso, Porto"}} (NOTE removed)
 
-2. Input: {"NOTE": "Brasileiro, nasceu em 12 agosto 1990"}
-   Output: {"BIRT": {"DATE": "12 August 1990", "PLAC": "Brazil"}} (NOTE removed)
+2. Input: {"_PDEF": "@I0002@", "NAME": {"_NAME": "João"}, "NOTE": "Brasileiro, nasceu em 12 agosto 1990"}
+   Output: {"_PDEF": "@I0002@", "NAME": {"_NAME": "João"}, "BIRT": {"DATE": "12 August 1990", "PLAC": "Brazil"}} (NOTE removed)
 
-3. Input: {"NOTE": "Natural de Lisboa, era carpinteiro"}
-   Output: {"BIRT": {"PLAC": "Lisboa"}, "OCCU": "carpinteiro"} (NOTE removed)
+3. Input: {"_PDEF": "@I0003@", "NAME": {"_NAME": "Maria"}, "NOTE": "Natural de Lisboa, era carpinteiro"}
+   Output: {"_PDEF": "@I0003@", "NAME": {"_NAME": "Maria"}, "BIRT": {"PLAC": "Lisboa"}, "OCCU": "carpinteiro"} (NOTE removed)
 
-4. Input: {"NOTE": "Batizado a 14/07/1919 em São Baptista, Rio de Janeiro"}
-   Output: {"BAPM": {"DATE": "14 July 1919", "PLAC": "São Baptista, Rio de Janeiro"}} (NOTE removed)
+4. Input: {"_PDEF": "@I0004@", "NAME": {"_NAME": "Pedro"}, "NOTE": "Batizado a 14/07/1919 em São Baptista, Rio de Janeiro"}
+   Output: {"_PDEF": "@I0004@", "NAME": {"_NAME": "Pedro"}, "BAPM": {"DATE": "14 July 1919", "PLAC": "São Baptista, Rio de Janeiro"}} (NOTE removed)
 
-5. Input: {"NOTE": "Faleceu em Belo Horizonte, casado"}
-   Output: {"DEAT": {"PLAC": "Belo Horizonte"}} (NOTE: "casado")
+5. Input: {"_PDEF": "@I0005@", "NAME": {"_NAME": "Ana"}, "NOTE": "Faleceu em Belo Horizonte, casado"}
+   Output: {"_PDEF": "@I0005@", "NAME": {"_NAME": "Ana"}, "DEAT": {"PLAC": "Belo Horizonte"}, "NOTE": "casado"}
+
+FINAL INSTRUCTION: Return a JSON array of COMPLETE individual objects with their modifications. Start with [ and end with ].

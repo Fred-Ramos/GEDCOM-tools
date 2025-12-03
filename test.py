@@ -86,7 +86,8 @@ def process_json_file(json_file):
         return
     
     individuals = data["INDI"]
-    chunks = chunk_individuals(individuals, 5)  # Reduced to 5 for testing
+    
+    chunks = chunk_individuals(individuals, 3)
     
     print(f"Found {len(individuals)} individuals, processing in {len(chunks)} chunks")
     
@@ -100,7 +101,7 @@ def process_json_file(json_file):
         
         # Print first 200 chars of request for debugging
         print(f"Request preview: {chunk_json[:200]}...")
-        
+
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -119,10 +120,11 @@ def process_json_file(json_file):
 
         if response.status_code == 200:
             result = response.json()
+            # print(f"Raw result: \n{result}\n")
             processed_text = result['choices'][0]['message']['content']
             
             # Print raw response for debugging
-            print(f"Raw response (first 500 chars):\n{processed_text[:500]}\n...")
+            print(f"Raw response:\n{processed_text}\n...")
             
             # Extract JSON from response
             processed_chunk = extract_json_from_response(processed_text)
@@ -130,13 +132,6 @@ def process_json_file(json_file):
             if processed_chunk and isinstance(processed_chunk, list):
                 modified_individuals.extend(processed_chunk)
                 print(f"✓ Success - parsed {len(processed_chunk)} individuals")
-                
-                # EXTREME DEBUG: Print entire JSON of first 2 individuals
-                print(f"\n=== FULL DEBUG Chunk {i+1} (first 2 individuals) ===")
-                for j in range(min(2, len(processed_chunk))):
-                    print(f"\nIndividual {j} FULL JSON:")
-                    print(json.dumps(processed_chunk[j], ensure_ascii=False, indent=2))
-
             else:
                 print(f"✗ Failed to parse JSON from response")
                 print(f"Using original {len(chunk)} individuals")
@@ -155,6 +150,10 @@ def process_json_file(json_file):
     # Replace INDI array with modified individuals
     data["INDI"] = modified_individuals
     
+    # Print the modified individuals (on the way out)
+    print("\n=== Modified Individuals (on the way out) ===")
+    print(json.dumps(modified_individuals, ensure_ascii=False, indent=2))
+    
     # Save output
     output_file = json_file.replace('.json', '_processed.json') if json_file.endswith('.json') else 'output.json'
     
@@ -163,6 +162,7 @@ def process_json_file(json_file):
     
     print(f"\n✅ Done! Processed {len(modified_individuals)} individuals.")
     print(f"Saved to {output_file}")
+
 
 if __name__ == "__main__":
     json_file = input("Enter JSON file name: ").strip()
