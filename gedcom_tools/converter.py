@@ -290,11 +290,36 @@ def to_json(people_by_id: Dict[int, Person_FTT],
     DOCUMENT = remove_empty_strings(DOCUMENT)
     return DOCUMENT
 
+def _split_conc(text: str, size: int = 200) -> List[str]:
+    """Split text into chunks of at most `size` chars, never cutting next to a space."""
+    chunks = []
+    while len(text) > size:
+        cut = size
+        while cut > 1 and (text[cut - 1] == " " or text[cut] == " "):
+            cut -= 1
+        chunks.append(text[:cut])
+        text = text[cut:]
+    chunks.append(text)
+    return chunks
+
 def json_to_gedcom(data: dict) -> str:
     """
     Convert JSON-structured GEDCOM (nested dicts/lists) back into flat GEDCOM lines.
     """
     lines = []
+
+    def emit(level, tag, value):
+        """
+        Write a simple value. Line breaks become CONT lines and long lines
+        are split with CONC so no GEDCOM line exceeds the 255 char limit.
+        """
+        for line_no, text in enumerate(str(value).split("\n")):
+            for chunk_no, chunk in enumerate(_split_conc(text)):
+                if line_no == 0 and chunk_no == 0:
+                    lvl, current = level, tag
+                else:
+                    lvl, current = level + 1, (T.CONTINUE if chunk_no == 0 else T.CONCAT)
+                lines.append(f"{lvl} {current} {chunk}" if chunk else f"{lvl} {current}")
 
     def walk(node, level, forced_tag=None):
         """
@@ -348,13 +373,13 @@ def json_to_gedcom(data: dict) -> str:
                             walk(item, level + 1)
                         else:
                             # Simple list item
-                            lines.append(f"{level} {tag} {item}")
+                            emit(level, tag, item)
                     continue
 
                 # --------------------------------------------
                 # A3 — simple value
                 # --------------------------------------------
-                lines.append(f"{level} {tag} {value}")
+                emit(level, tag, value)
 
         else:
             pass

@@ -29,6 +29,7 @@ class Tags:
     HUSBAND = "HUSB"          # Individual in role of married man or father
     INDIVIDUAL = "INDI"       # A person
     MARRIAGE = "MARR"         # Event of creating a family unit
+    RESIDENCE = "RESI"        # Act of dwelling at a place
     NAME = "NAME"             # Name used to identify individual
     OBJECT = "OBJE"           # Multimedia object
     OCCUPATION = "OCCU"       # Type of work or profession

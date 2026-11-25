@@ -30,6 +30,17 @@ name:
 
     example.ftz  ->  example.ged
 
+## Turning notes into GEDCOM records (Claude Code)
+
+The app stores births, baptisms, deaths, burials, occupations and marriages as free text
+in each person's note. With [Claude Code](https://claude.com/claude-code) open in this
+repository, ask it to interpret the notes of a tree (or run `/gedcom-notes`):
+
+    example.ftz  ->  example_processed.ged   (notes turned into BIRT, BAPM, DEAT, BURI, RESI, OCCU, MARR)
+
+The skill lives in `.claude/skills/gedcom-notes/`. The interpretation rules are in `rules.md`.
+Existing data is never overwritten; disagreements are reported.
+
 ## Notes
 
 -   Person images inside FTZ files are detected but currently not
