@@ -19,7 +19,13 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   only) → Their children (of all those siblings) → Grandchildren; never more than 2 generations below a
   sibling. Spouses are shown for anyone whose children are shown; couples are woman left, man right.
   Layout: one row per generation, a mother's side branches open left and a father's right, blocks are
-  packed so cards never overlap, lines are horizontal/vertical only.
+  packed so people never overlap; the column under the chosen person stays free for the trunk.
+  Drawing: an illustrated tree in SVG (not retro, unlike the interface). Family links form a branch
+  skeleton rooted at the chosen person; each branch is a tapered Bezier shape whose radius follows the
+  pipe model (~ sqrt of the people it carries); siblings hang from a bough; randomness (bends, leaves)
+  is seeded by person ids so a tree always looks the same. People are semi-transparent medallions drawn
+  on top of the wood. Click a person to get the Siblings / Their children / Grandchildren checkboxes.
+  Default 5 generations (selector), Fit to max, Save PNG / Save SVG.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 
 `main.py` and `interpret.py` add `src/` to `sys.path`, so no install is needed.
