@@ -14,7 +14,7 @@ python3 -m http.server
 # then open http://localhost:8000/web/
 ```
 
-To publish it, enable GitHub Pages for the repository root; the page is then at `/web/`.
+To publish it, enable GitHub Pages for the repository root. The root `index.html` redirects to `/web/`, so the site's main address opens the page.
 
 ## Usage from release
 
