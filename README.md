@@ -2,6 +2,20 @@
 
 This repository converts .ftz family tree archives (used in the android app **Quick Family Tree**) into standard GEDCOM 5.5.1 files, compatible with most genealogy tools.
 
+## Usage in the browser
+
+Open the web page (`web/index.html`), choose an `.ftz` file and the `.ged` downloads.
+The conversion runs in your browser with [Pyodide](https://pyodide.org); the file is never uploaded.
+
+To run the page locally, serve the repository root (opening the file directly does not work):
+
+``` bash
+python3 -m http.server
+# then open http://localhost:8000/web/
+```
+
+To publish it, enable GitHub Pages for the repository root; the page is then at `/web/`.
+
 ## Usage from release
 
 1. Download `gedcom_tools.exe` from the releases.
@@ -20,7 +34,15 @@ This repository converts .ftz family tree archives (used in the android app **Qu
 4.  Run:
 
 ``` bash
-python3 main.py
+python3 main.py                  # converts every .ftz in the current directory
+python3 main.py tree.ftz         # or only the files you name
+```
+
+Or install it as a command:
+
+``` bash
+pip install .
+gedcom-tools                     # same as python3 main.py
 ```
 
 ## Result

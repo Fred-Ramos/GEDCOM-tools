@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gedcom-tools"
+dynamic = ["version"]
+description = "Convert Quick Family Tree .ftz archives into GEDCOM 5.5.1 files"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+interpret = ["requests", "python-dotenv"]
+
+[project.scripts]
+gedcom-tools = "gedcom_tools.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "gedcom_tools.__version__" }

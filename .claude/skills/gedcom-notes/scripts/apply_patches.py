@@ -24,7 +24,7 @@ from collections import Counter
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from gedcom_tools.converter import json_to_gedcom  # noqa: E402
 
 INDI_EVENTS = {"BIRT", "BAPM", "DEAT", "BURI", "RESI"}

@@ -11,3 +11,7 @@ __pycache__/
 
 # Ignore any error_chunk_*.txt files
 error_chunk_*.txt
+# Python packaging
+*.egg-info/
+build/
+dist/

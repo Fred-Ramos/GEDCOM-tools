@@ -1,16 +1,8 @@
-import os
-from gedcom_tools.converter import process_ftz
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))  # package lives in src/
+
+from gedcom_tools.cli import main
 
 if __name__ == "__main__":
-    files = os.listdir()
-    ftz_files = []
-    for file in files:
-        if file.endswith(".ftz"):
-            ftz_files.append(file)
-            output_name=file[:-4]
-            print(f"Found FTT {file}, converting to GEDCOM {output_name}")
-            process_ftz(file, output_name)
-
-    print(f"Converted all FTT files:")
-    for file in ftz_files:
-        print(file)
+    main()

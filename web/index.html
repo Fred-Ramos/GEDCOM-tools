@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FTZ to GEDCOM</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"></script>
+</head>
+<body>
+<h1>.ftz &rarr; GEDCOM</h1>
+<p>Converts a Quick Family Tree <code>.ftz</code> file into a GEDCOM 5.5.1 <code>.ged</code> file.
+The conversion runs in your browser: the file is never uploaded.</p>
+<input type="file" id="file" accept=".ftz" disabled>
+<p id="status">Loading Python&hellip;</p>
+<p id="result"></p>
+
+<script>
+// The converter is the Python package in src/, run in the browser with Pyodide.
+const SRC = "../src/gedcom_tools/";
+const MODULES = ["__init__", "converter", "enums", "models", "utils"];
+
+const input = document.getElementById("file");
+const status = document.getElementById("status");
+const result = document.getElementById("result");
+
+async function setup() {
+  const pyodide = await loadPyodide();
+  pyodide.FS.mkdirTree("/app/gedcom_tools");
+  for (const name of MODULES) {
+    const response = await fetch(SRC + name + ".py");
+    if (!response.ok) throw new Error(`could not load ${name}.py (HTTP ${response.status})`);
+    pyodide.FS.writeFile(`/app/gedcom_tools/${name}.py`, await response.text());
+  }
+  return pyodide.runPython(`
+import sys
+sys.path.insert(0, "/app")
+from gedcom_tools.converter import ftz_to_gedcom
+lambda js_bytes: ftz_to_gedcom(js_bytes.to_bytes())
+`);
+}
+
+function lastLine(error) {
+  // Python errors arrive with the full traceback; the last line is the message.
+  return String(error.message || error).trim().split("\n").pop();
+}
+
+setup().then((convert) => {
+  status.textContent = "Ready. Choose an .ftz file.";
+  input.disabled = false;
+
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    result.textContent = "";
+    status.textContent = `Converting ${file.name}…`;
+    try {
+      const gedcom = convert(new Uint8Array(await file.arrayBuffer()));
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([gedcom], { type: "text/plain;charset=utf-8" }));
+      link.download = file.name.replace(/\.ftz$/i, "") + ".ged";
+      link.textContent = "Download " + link.download;
+      result.appendChild(link);
+      link.click();
+      status.textContent = `Done: ${gedcom.split("\n").filter((l) => / INDI$/.test(l)).length} people converted.`;
+    } catch (error) {
+      status.textContent = "Error: " + lastLine(error);
+    }
+    input.value = "";
+  });
+}).catch((error) => {
+  status.textContent = "Could not start: " + lastLine(error) +
+    ". If you opened this file directly, serve the repo instead: python3 -m http.server, then open http://localhost:8000/web/";
+});
+</script>
+</body>
+</html>

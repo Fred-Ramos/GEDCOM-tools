@@ -1,6 +1,6 @@
 import zipfile
 from io import BytesIO
-from typing import Optional, Dict, List, Tuple
+from typing import Dict, List, Tuple
 from datetime import datetime
 import json
 
@@ -390,91 +390,84 @@ def json_to_gedcom(data: dict) -> str:
     return "\n".join(lines) + "\n"
 
 # ---------------------------
-# Main convert flow
+# Conversion from bytes (no file I/O: used by the CLI and the web page)
+# ---------------------------
+def inspect_ftz(archive: zipfile.ZipFile) -> Tuple[str, List[str]]:
+    """Return (tree folder name, list of face image paths) of an open .ftz archive."""
+    names = archive.namelist()
+    top_folders = {name.split("/")[0] for name in names if "/" in name}
+    if not top_folders:
+        raise ValueError("No folder structure found inside the archive.")
+    folder_name = top_folders.pop()  # assume only one root
+    # Support both "faces/" and "face/"
+    faces_prefixes = (f"{folder_name}/faces/", f"{folder_name}/face/")
+    faces = [n for n in names if n.startswith(faces_prefixes) and n.lower().endswith(".jpg")]
+    return folder_name, faces
+
+def ftz_to_json(data: bytes, lang: str = "English") -> dict:
+    """
+    Convert the raw bytes of an .ftz archive into GEDCOM JSON.
+    Raises ValueError when the archive is not a valid family tree.
+    """
+    try:
+        archive = zipfile.ZipFile(BytesIO(bytes(data)))
+    except zipfile.BadZipFile:
+        raise ValueError("Not a valid .ftz file (it is not a zip archive).")
+    with archive:
+        folder_name, _ = inspect_ftz(archive)
+        node_name = f"{folder_name}/node.ftt"
+        if node_name not in archive.namelist():
+            raise ValueError("node.ftt not found in the archive.")
+        raw = archive.read(node_name)
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ValueError("node.ftt is not valid UTF-8 text.")
+    people_by_id, couples_by_id = parse_node_ftt(text)
+    return to_json(people_by_id, couples_by_id, lang=lang)
+
+def ftz_to_gedcom(data: bytes, lang: str = "English") -> str:
+    """Convert the raw bytes of an .ftz archive into GEDCOM 5.5.1 text."""
+    return json_to_gedcom(ftz_to_json(data, lang))
+
+# ---------------------------
+# Main convert flow (CLI: reads the .ftz and writes .json + .ged)
 # ---------------------------
 def convert(file: str, output_name: str):
-    faces_images: List[Tuple[str, BytesIO]] = []   # list of (filename, BytesIO)
-    node_file: Optional[Tuple[str, bytes]] = None  # (filename, bytes)
-
     if not file.lower().endswith(".ftz"):
         print("Not an .ftz file. Exiting.")
         return None
-    
+
     print(f"Processing {file} ...")
-    with zipfile.ZipFile(file, 'r') as archive:
-        files = archive.namelist()
+    with open(file, "rb") as f:
+        data = f.read()
 
-        # Detect top-level folder (first part before '/')
-        top_folders = {name.split("/")[0] for name in files if "/" in name}
-        if not top_folders:
-            print("⚠️ No folder structure found inside the archive.")
-            return None
-
-        folder_name = top_folders.pop()  # assume only one root
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as archive:
+            folder_name, faces = inspect_ftz(archive)
         print(f"Found Family Tree: {folder_name}")
-
-        # Support both "faces/" and "face/"
-        faces_prefixes = [f"{folder_name}/faces/", f"{folder_name}/face/"]
-        has_faces_folder = any(
-            any(name.startswith(prefix) for name in files) for prefix in faces_prefixes
-        )
-
-        if has_faces_folder:
-            for name in files:
-                if any(name.startswith(prefix) for prefix in faces_prefixes) and name.lower().endswith(".jpg"):
-                    with archive.open(name) as f:
-                        faces_images.append((name, BytesIO(f.read())))
-            print(f"Faces folder found with {len(faces_images)} image(s).")
-            if faces_images:
-                print("Faces list:")
-                for fname, _ in faces_images:
-                    print(" -", fname)
+        if faces:
+            print(f"Faces folder found with {len(faces)} image(s).")
+            print("Faces list:")
+            for fname in faces:
+                print(" -", fname)
         else:
             print("No faces folder available.")
 
-        # Collect node.ftt (mandatory)
-        for name in files:
-            if name == f"{folder_name}/node.ftt":
-                with archive.open(name) as f:
-                    node_file = (name, f.read())
-                break
+        gedcom_json = ftz_to_json(data)
+    except (ValueError, zipfile.BadZipFile) as e:
+        print(f"⚠️ {e}")
+        return None
 
-    # node.ftt summary + parsing
-    people_by_id: Dict[int, Person_FTT] = {}
-    couples_by_id: Dict[int, Couple_FTT] = {}
+    json_name = output_name + ".json"
+    with open(json_name, "w", encoding="utf-8") as f:
+        json.dump(gedcom_json, f, indent=2)
+    print(f"JSON written to: {json_name}")
 
-    if node_file:
-        print("Found node.ftt")
-        try:
-            text = node_file[1].decode("utf-8-sig")
-            # Parse into structures
-            people_by_id, couples_by_id = parse_node_ftt(text)
-
-            # Generate JSON
-            gedcom_json = to_json(people_by_id, couples_by_id,
-                      lang="English")
-            json_name = output_name + ".json"
-            # Write JSON file
-            with open(json_name, "w", encoding="utf-8") as f:
-                json.dump(gedcom_json, f, indent=2)
-            print(f"JSON written to: {json_name}")
-
-            # Convert to GEDCOM
-            gedcom = json_to_gedcom(gedcom_json)
-            gedcom_name = output_name + ".ged"
-            # Write GEDCOM file
-            with open(gedcom_name, "w", encoding="utf-8") as f:
-                f.write(gedcom)
-            print(f"GEDCOM written to: {gedcom_name}")
-
-
-            return
-        except UnicodeDecodeError:
-            print("⚠️ node.ftt is not valid UTF-8 text.")
-    else:
-        print("⚠️ node.ftt not found!")
-
-    return None
+    gedcom_name = output_name + ".ged"
+    with open(gedcom_name, "w", encoding="utf-8") as f:
+        f.write(json_to_gedcom(gedcom_json))
+    print(f"GEDCOM written to: {gedcom_name}")
 
 def process_ftz(file: str, output_name: str):
     convert(file, output_name)

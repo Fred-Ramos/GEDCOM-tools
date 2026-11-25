@@ -16,7 +16,7 @@ All commands run from the repository root. `SK=.claude/skills/gedcom-notes/scrip
 If the user gave a `.ftz`, convert it first (writes `NAME.json` and `NAME.ged`):
 
 ```bash
-python3 -c "from gedcom_tools.converter import process_ftz; process_ftz('NAME.ftz', 'NAME')"
+PYTHONPATH=src python3 -c "from gedcom_tools.converter import process_ftz; process_ftz('NAME.ftz', 'NAME')"
 ```
 
 ## 2. Extract the notes into batches

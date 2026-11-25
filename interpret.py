@@ -3,6 +3,9 @@ import os
 import json
 import re
 from dotenv import load_dotenv
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))  # package lives in src/
 
 from gedcom_tools.converter import json_to_gedcom
 
