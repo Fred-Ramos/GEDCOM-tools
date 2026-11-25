@@ -1,3 +1,4 @@
+import re
 import zipfile
 from io import BytesIO
 from typing import Dict, List, Tuple
@@ -388,6 +389,76 @@ def json_to_gedcom(data: dict) -> str:
     walk(data, 0)
 
     return "\n".join(lines) + "\n"
+
+# ---------------------------
+# GEDCOM text -> JSON (the reverse of json_to_gedcom)
+# ---------------------------
+# Tags that are always lists, as to_json makes them, even when they appear once.
+_LIST_TAGS = {T.INDIVIDUAL, T.FAMILY, T.FAMILY_AS_CHILD, T.FAMILY_AS_SPOUSE, T.CHILD}
+# Pointer tags that to_json writes as {"_PREF": ...} objects instead of plain strings.
+_POINTER_OBJECT_TAGS = {T.FAMILY_AS_CHILD, T.FAMILY_AS_SPOUSE}
+_GED_LINE = re.compile(r"^\s*(\d+)\s+(?:(@[^@]+@)\s+)?(\S+)(?: (.*))?$")
+_POINTER = re.compile(r"@[^@\s]+@")
+
+def gedcom_to_json(text: str) -> dict:
+    """
+    Parse GEDCOM text (from this tool or any other program) into the JSON structure used
+    by to_json/json_to_gedcom. CONT/CONC lines are joined back into their value.
+    Raises ValueError on a line that is not GEDCOM.
+    """
+    root = {"tag": None, "value": None, "xref": None, "children": []}
+    stack = [(-1, root)]
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        match = _GED_LINE.match(line)
+        if not match:
+            raise ValueError(f"Line {number} is not GEDCOM: {line[:60]!r}")
+        level, xref, tag, value = int(match.group(1)), match.group(2), match.group(3), match.group(4)
+        while stack[-1][0] >= level:
+            stack.pop()
+        if level != stack[-1][0] + 1:
+            raise ValueError(f"Line {number}: level {level} does not follow level {stack[-1][0]}")
+        parent = stack[-1][1]
+        if tag in (T.CONTINUE, T.CONCAT):
+            parent["value"] = (parent["value"] or "") + ("\n" if tag == T.CONTINUE else "") + (value or "")
+            continue
+        node = {"tag": tag, "value": value, "xref": xref, "children": []}
+        parent["children"].append(node)
+        stack.append((level, node))
+    return _ged_children(root["children"])
+
+def _ged_children(children) -> dict:
+    out, repeated = {}, set()
+    for child in children:
+        tag, value = child["tag"], _ged_value(child)
+        if tag in _LIST_TAGS:
+            out.setdefault(tag, []).append(value)
+        elif tag in out:
+            if tag not in repeated:
+                out[tag] = [out[tag]]
+                repeated.add(tag)
+            out[tag].append(value)
+        else:
+            out[tag] = value
+    return out
+
+def _ged_value(node):
+    value = node["value"] or None
+    is_pointer = bool(value and _POINTER.fullmatch(value))
+    if not node["children"] and not node["xref"]:
+        if value is None:
+            return {}
+        if is_pointer and node["tag"] in _POINTER_OBJECT_TAGS:
+            return {T._PREF: value}
+        return value
+    result = {}
+    if node["xref"]:
+        result[T._PDEF] = node["xref"]
+    if value is not None:
+        result[T._PREF if is_pointer else T._NAME] = value
+    result.update(_ged_children(node["children"]))
+    return result
 
 # ---------------------------
 # Conversion from bytes (no file I/O: used by the CLI and the web page)

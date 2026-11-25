@@ -3,27 +3,289 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FTZ to GEDCOM</title>
+<title>GEDCOM Tools</title>
 <script src="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"></script>
+<style>
+  :root {
+    --face: #c0c0c0;
+    --light: #dfdfdf;
+    --white: #ffffff;
+    --shadow: #808080;
+    --black: #000000;
+    --title-a: #000080;
+    --title-b: #1084d0;
+    --muted: #404040;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; border-radius: 0 !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--face);
+    color: var(--black);
+    font: 13px/1.45 Tahoma, Verdana, "Segoe UI", sans-serif;
+  }
+
+  /* Bevels */
+  .raised, button, .window, [role="tabpanel"] {
+    box-shadow: inset -1px -1px var(--black), inset 1px 1px var(--white),
+                inset -2px -2px var(--shadow), inset 2px 2px var(--light);
+  }
+  .sunken, .field, textarea, .input, .tree-viewport, #tree-matches {
+    box-shadow: inset -1px -1px var(--white), inset 1px 1px var(--shadow),
+                inset -2px -2px var(--light), inset 2px 2px var(--black);
+  }
+
+  /* The window fills the screen, like a maximised window. */
+  .window {
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    padding: 3px; background: var(--face);
+  }
+  .titlebar {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 3px 6px;
+    background: linear-gradient(90deg, var(--title-a), var(--title-b));
+    color: var(--white); font-weight: bold;
+  }
+  .titlebar span:last-child { font-weight: normal; }
+  .content { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 6px 4px; }
+
+  /* Tabs */
+  [role="tablist"] { display: flex; align-items: flex-end; padding-left: 4px; }
+  [role="tab"] {
+    position: relative;
+    margin-top: 2px;
+    padding: 3px 14px;
+    border: 0;
+    background: var(--face);
+    font: inherit; color: inherit; cursor: pointer;
+    box-shadow: inset 1px 1px var(--white), inset -1px 0 var(--black),
+                inset 2px 2px var(--light), inset -2px 0 var(--shadow);
+  }
+  [role="tab"][aria-selected="true"] {
+    z-index: 2; margin: 0 -2px -2px; padding: 4px 16px 7px;
+  }
+  [role="tab"]:focus-visible { outline: 1px dotted var(--black); outline-offset: -5px; }
+  [role="tabpanel"] {
+    position: relative; z-index: 1; flex: 1; min-height: 0; overflow: auto;
+    padding: 14px 12px 12px; background: var(--face);
+  }
+  .readable { max-width: 760px; }
+
+  /* Controls */
+  fieldset {
+    margin: 0 0 12px; padding: 8px 10px 10px;
+    border: 1px solid var(--shadow);
+    box-shadow: 1px 1px 0 var(--white), inset 1px 1px 0 var(--white);
+  }
+  legend { padding: 0 4px; }
+  p { margin: 0 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+  .grow { flex: 1 1 180px; min-width: 0; }
+  button {
+    min-width: 88px; padding: 4px 14px;
+    border: 0; background: var(--face);
+    font: inherit; color: inherit; cursor: pointer;
+  }
+  button:active:not(:disabled) {
+    box-shadow: inset -1px -1px var(--white), inset 1px 1px var(--black),
+                inset -2px -2px var(--light), inset 2px 2px var(--shadow);
+    padding: 5px 13px 3px 15px;
+  }
+  button:focus-visible { outline: 1px dotted var(--black); outline-offset: -5px; }
+  button:disabled { color: var(--shadow); text-shadow: 1px 1px var(--white); cursor: default; }
+  .field {
+    padding: 4px 6px; background: var(--white);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hint { margin: 8px 0 0; color: var(--muted); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  dl.stats { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 0 0 10px; }
+  dl.stats dt { color: var(--muted); }
+  dl.stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  textarea {
+    display: block; width: 100%; height: 220px; padding: 4px 6px;
+    border: 0; resize: vertical; background: var(--white);
+    font: 12px/1.35 "Courier New", Courier, monospace; white-space: pre;
+  }
+  .input { padding: 4px 6px; border: 0; background: var(--white); font: inherit; color: inherit; }
+  .input:focus { outline: 1px dotted var(--black); outline-offset: -4px; }
+  .input:disabled { background: var(--face); }
+
+  /* Family tree */
+  #panel-tree:not([hidden]) { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .search-box { position: relative; flex: 0 1 340px; min-width: 200px; }
+  .search-box .input { width: 100%; }
+  #tree-matches {
+    position: absolute; z-index: 20; top: 100%; left: 0; width: 100%;
+    border: 0; background: var(--white); font: inherit;
+  }
+  button.small { min-width: 28px; padding: 4px 8px; }
+  #zoom-label { min-width: 52px; text-align: center; }
+  #tree-file { flex: 0 1 340px; min-width: 160px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; border: 1px solid var(--black); }
+  .tree-empty { padding: 4px 0; color: var(--muted); }
+  .tree-viewport { flex: 1; min-height: 200px; overflow: auto; background: var(--white); cursor: grab; touch-action: none; }
+  .tree-viewport.panning { cursor: grabbing; }
+  .tree-sizer { position: relative; }
+  .tree-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .tree-stage svg { position: absolute; left: 0; top: 0; }
+  .tree-stage path { fill: none; stroke: var(--black); stroke-width: 1; shape-rendering: crispEdges; }
+  .tcard {
+    position: absolute; padding: 4px 6px; overflow: hidden; cursor: default;
+    font-size: 12px; line-height: 15px; background: var(--white);
+    box-shadow: inset 0 0 0 1px var(--black);
+  }
+  .tcard.ancestor, .legend .ancestor {
+    background: var(--face);
+    box-shadow: inset -1px -1px var(--black), inset 1px 1px var(--white),
+                inset -2px -2px var(--shadow), inset 2px 2px var(--light);
+  }
+  .tcard.root, .legend .root { background: var(--title-a); color: var(--white); box-shadow: inset 0 0 0 1px var(--black); }
+  .tcard.spouse, .legend .spouse { background: var(--light); box-shadow: inset 0 0 0 1px var(--shadow); }
+  .legend .relative { background: var(--white); }
+  .legend .ancestor { background: var(--face); }
+  .tname {
+    height: 30px; overflow: hidden; font-weight: bold;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .tcard.spouse .tname, .tcard.relative .tname { font-weight: normal; }
+  .tyears { height: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tcard.root .tyears { color: var(--light); }
+  .tcard label { display: block; height: 19px; padding-top: 2px; white-space: nowrap; cursor: pointer; }
+  .tcard input[type="checkbox"] { margin: 0 3px 0 0; vertical-align: -2px; accent-color: var(--title-a); }
+
+  .statusbar { display: flex; gap: 2px; margin-top: 4px; }
+  .statusbar > div {
+    padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: inset 1px 1px var(--shadow), inset -1px -1px var(--white);
+  }
+  .statusbar > div:first-child { flex: 1; }
+  .window.dragging [role="tabpanel"] { outline: 2px dashed var(--title-a); outline-offset: -6px; }
+  a { color: var(--title-a); }
+</style>
 </head>
 <body>
-<h1>.ftz &rarr; GEDCOM</h1>
-<p>Converts a Quick Family Tree <code>.ftz</code> file into a GEDCOM 5.5.1 <code>.ged</code> file.
-The conversion runs in your browser: the file is never uploaded.</p>
-<input type="file" id="file" accept=".ftz" disabled>
-<p id="status">Loading Python&hellip;</p>
-<p id="result"></p>
+<div class="window" id="window">
+  <div class="titlebar"><span>GEDCOM Tools</span><span>.ftz &rarr; .ged</span></div>
+  <div class="content">
+    <div role="tablist" aria-label="Tools">
+      <button role="tab" id="tab-convert" aria-controls="panel-convert" aria-selected="true">Convert</button>
+      <button role="tab" id="tab-tree" aria-controls="panel-tree" aria-selected="false" tabindex="-1">Family tree</button>
+    </div>
 
+    <!-- Tab 1: convert -->
+    <section role="tabpanel" id="panel-convert" aria-labelledby="tab-convert">
+      <div class="readable">
+      <fieldset>
+        <legend>1. Open a Quick Family Tree file</legend>
+        <div class="row">
+          <button id="open" disabled>Open .ftz&hellip;</button>
+          <div class="field grow" id="filename">No file opened</div>
+        </div>
+        <input type="file" id="file" accept=".ftz" class="visually-hidden" tabindex="-1" aria-hidden="true">
+        <p class="hint">You can also drop the file onto this window. It is converted on this computer and never uploaded.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>2. Result</legend>
+        <dl class="stats">
+          <dt>Tree</dt><dd id="s-name">&ndash;</dd>
+          <dt>People</dt><dd id="s-people">&ndash;</dd>
+          <dt>Families</dt><dd id="s-families">&ndash;</dd>
+          <dt>People with notes</dt><dd id="s-notes">&ndash;</dd>
+          <dt>Photos (not exported)</dt><dd id="s-faces">&ndash;</dd>
+        </dl>
+        <div class="row">
+          <button id="save-ged" disabled>Save .ged</button>
+          <button id="save-json" disabled>Save .json</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Preview</legend>
+        <textarea id="preview" readonly wrap="off" spellcheck="false" aria-label="GEDCOM preview"
+                  placeholder="The GEDCOM file appears here after converting."></textarea>
+      </fieldset>
+      </div>
+    </section>
+
+    <!-- Tab 2: family tree -->
+    <section role="tabpanel" id="panel-tree" aria-labelledby="tab-tree" hidden>
+      <div class="toolbar">
+        <span>Tree file:</span>
+        <button id="tree-open" disabled>Open .ged&hellip;</button>
+        <div class="field" id="tree-file">None yet</div>
+        <input type="file" id="tree-file-input" accept=".ged,.json" class="visually-hidden" tabindex="-1" aria-hidden="true">
+      </div>
+      <div class="toolbar">
+        <label for="tree-search">Person:</label>
+        <div class="search-box">
+          <input id="tree-search" class="input" type="search" autocomplete="off" spellcheck="false"
+                 placeholder="Type a name, e.g. Miguel Ramos" disabled>
+          <select id="tree-matches" aria-label="Matching people" hidden></select>
+        </div>
+        <button id="zoom-out" class="small" aria-label="Zoom out">&minus;</button>
+        <div class="field" id="zoom-label">100%</div>
+        <button id="zoom-in" class="small" aria-label="Zoom in">+</button>
+        <span class="legend" aria-hidden="true">
+          <span><i class="root"></i>Chosen</span><span><i class="ancestor"></i>Ancestor</span>
+          <span><i class="relative"></i>Relative</span><span><i class="spouse"></i>Spouse</span>
+        </span>
+      </div>
+      <p class="tree-empty" id="tree-empty">Convert a file in <a href="#convert">Convert</a>, or open a .ged file above.</p>
+      <div class="tree-viewport" id="tree-viewport" hidden>
+        <div class="tree-sizer" id="tree-sizer"><div class="tree-stage" id="tree-stage"></div></div>
+      </div>
+    </section>
+
+    <div class="statusbar" role="status" aria-live="polite">
+      <div id="status">Loading Python&hellip;</div>
+      <div id="python">Python: loading</div>
+      <div id="version">v&ndash;</div>
+    </div>
+  </div>
+</div>
+
+<noscript><p style="color:#fff">This page needs JavaScript to run the converter.</p></noscript>
+
+<script src="tree.js"></script>
 <script>
-// The converter is the Python package in src/, run in the browser with Pyodide.
+// ------------------------------------------------------------------
+// Python (the converter in src/, run in the browser with Pyodide)
+// ------------------------------------------------------------------
 const SRC = "../src/gedcom_tools/";
 const MODULES = ["__init__", "converter", "enums", "models", "utils"];
+const GLUE = `
+import sys, json, zipfile
+from io import BytesIO
+sys.path.insert(0, "/app")
+from gedcom_tools import __version__
+from gedcom_tools.converter import ftz_to_json, json_to_gedcom, inspect_ftz, gedcom_to_json
 
-const input = document.getElementById("file");
-const status = document.getElementById("status");
-const result = document.getElementById("result");
+def web_convert(js_bytes):
+    data = js_bytes.to_bytes()
+    tree = ftz_to_json(data)
+    with zipfile.ZipFile(BytesIO(data)) as archive:
+        name, faces = inspect_ftz(archive)
+    return json.dumps({"name": name, "faces": len(faces), "tree": tree,
+                       "gedcom": json_to_gedcom(tree)}, ensure_ascii=False)
 
-async function setup() {
+def web_read_ged(js_bytes):
+    raw = js_bytes.to_bytes()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    return json.dumps(gedcom_to_json(text), ensure_ascii=False)
+`;
+
+async function startPython() {
   const pyodide = await loadPyodide();
   pyodide.FS.mkdirTree("/app/gedcom_tools");
   for (const name of MODULES) {
@@ -31,45 +293,176 @@ async function setup() {
     if (!response.ok) throw new Error(`could not load ${name}.py (HTTP ${response.status})`);
     pyodide.FS.writeFile(`/app/gedcom_tools/${name}.py`, await response.text());
   }
-  return pyodide.runPython(`
-import sys
-sys.path.insert(0, "/app")
-from gedcom_tools.converter import ftz_to_gedcom
-lambda js_bytes: ftz_to_gedcom(js_bytes.to_bytes())
-`);
+  pyodide.runPython(GLUE);
+  const webConvert = pyodide.globals.get("web_convert");
+  const webReadGed = pyodide.globals.get("web_read_ged");
+  return {
+    version: pyodide.globals.get("__version__"),
+    convert: (bytes) => JSON.parse(webConvert(bytes)),
+    readGed: (bytes) => JSON.parse(webReadGed(bytes)),
+  };
 }
+
+// ------------------------------------------------------------------
+// Page
+// ------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const state = { python: null, result: null, stem: "" };
+const PREVIEW_LINES = 300;
+
+function setStatus(text) { $("status").textContent = text; }
 
 function lastLine(error) {
   // Python errors arrive with the full traceback; the last line is the message.
-  return String(error.message || error).trim().split("\n").pop();
+  return String((error && error.message) || error).trim().split("\n").pop();
 }
 
-setup().then((convert) => {
-  status.textContent = "Ready. Choose an .ftz file.";
-  input.disabled = false;
+function save(text, filename, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-  input.addEventListener("change", async () => {
-    const file = input.files[0];
-    if (!file) return;
-    result.textContent = "";
-    status.textContent = `Converting ${file.name}…`;
-    try {
-      const gedcom = convert(new Uint8Array(await file.arrayBuffer()));
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(new Blob([gedcom], { type: "text/plain;charset=utf-8" }));
-      link.download = file.name.replace(/\.ftz$/i, "") + ".ged";
-      link.textContent = "Download " + link.download;
-      result.appendChild(link);
-      link.click();
-      status.textContent = `Done: ${gedcom.split("\n").filter((l) => / INDI$/.test(l)).length} people converted.`;
-    } catch (error) {
-      status.textContent = "Error: " + lastLine(error);
-    }
-    input.value = "";
+// Tabs ---------------------------------------------------------------
+// The URL hash (#convert, #tree) selects the tab; panels are "panel-<hash>" so the page does not jump.
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+const tabName = (tab) => tab.getAttribute("aria-controls").replace("panel-", "");
+
+function selectTab(name, focus) {
+  for (const tab of tabs) {
+    const selected = tabName(tab) === name;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    $(tab.getAttribute("aria-controls")).hidden = !selected;
+    if (selected && focus) tab.focus();
+  }
+}
+
+for (const tab of tabs) {
+  tab.addEventListener("click", () => { location.hash = tabName(tab); });
+  tab.addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+    history.replaceState(null, "", "#" + tabName(next));
+    selectTab(tabName(next), true);
   });
+}
+
+function selectFromHash() {
+  const id = location.hash.slice(1);
+  selectTab(tabs.some((t) => tabName(t) === id) ? id : "convert");
+}
+window.addEventListener("hashchange", selectFromHash);
+selectFromHash();
+
+// Convert ------------------------------------------------------------
+async function convertFile(file) {
+  if (!state.python) { setStatus("Python is still loading, try again in a moment."); return; }
+  $("filename").textContent = file.name;
+  setStatus(`Converting ${file.name}…`);
+  try {
+    const result = state.python.convert(new Uint8Array(await file.arrayBuffer()));
+    state.result = result;
+    state.stem = file.name.replace(/\.ftz$/i, "");
+    showResult(result);
+    setStatus(`Converted ${file.name}.`);
+  } catch (error) {
+    setStatus("Error: " + lastLine(error));
+  }
+}
+
+function showResult({ name, faces, tree, gedcom }) {
+  const people = tree.INDI || [];
+  $("s-name").textContent = name;
+  $("s-people").textContent = people.length;
+  $("s-families").textContent = (tree.FAM || []).length;
+  $("s-notes").textContent = people.filter((p) => p.NOTE).length;
+  $("s-faces").textContent = faces;
+  $("save-ged").disabled = false;
+  $("save-json").disabled = false;
+
+  const lines = gedcom.split("\n");
+  $("preview").value = lines.slice(0, PREVIEW_LINES).join("\n") +
+    (lines.length > PREVIEW_LINES ? `\n… (${lines.length - PREVIEW_LINES} more lines in the saved file)` : "");
+
+  treeView.load(tree);
+  $("tree-file").textContent = `${state.stem}.ged (from Convert)`;
+}
+
+$("open").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", () => {
+  if ($("file").files[0]) convertFile($("file").files[0]);
+  $("file").value = "";
+});
+$("save-ged").addEventListener("click", () =>
+  save(state.result.gedcom, state.stem + ".ged", "text/plain;charset=utf-8"));
+$("save-json").addEventListener("click", () =>
+  save(JSON.stringify(state.result.tree, null, 2), state.stem + ".json", "application/json"));
+
+// Drag and drop onto the window
+const win = $("window");
+win.addEventListener("dragover", (event) => { event.preventDefault(); win.classList.add("dragging"); });
+win.addEventListener("dragleave", (event) => { if (!win.contains(event.relatedTarget)) win.classList.remove("dragging"); });
+win.addEventListener("drop", (event) => {
+  event.preventDefault();
+  win.classList.remove("dragging");
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  if (/\.(ged|json)$/i.test(file.name)) {
+    selectTab("tree"); history.replaceState(null, "", "#tree"); loadTreeFile(file);
+  } else {
+    selectTab("convert"); history.replaceState(null, "", "#convert"); convertFile(file);
+  }
+});
+
+// Family tree (web/tree.js) ------------------------------------------
+const treeView = FamilyTree.create({
+  search: $("tree-search"), matches: $("tree-matches"), empty: $("tree-empty"),
+  viewport: $("tree-viewport"), sizer: $("tree-sizer"), stage: $("tree-stage"),
+  zoomIn: $("zoom-in"), zoomOut: $("zoom-out"), zoomLabel: $("zoom-label"),
+}, { onStatus: setStatus });
+
+// The tree reads the file converted in the first tab, or any .ged / .json chosen here.
+async function loadTreeFile(file) {
+  if (!state.python) { setStatus("Python is still loading, try again in a moment."); return; }
+  setStatus(`Reading ${file.name}…`);
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const tree = /\.json$/i.test(file.name)
+      ? JSON.parse(new TextDecoder().decode(bytes))
+      : state.python.readGed(bytes);
+    if (!tree || !Array.isArray(tree.INDI) || !tree.INDI.length) throw new Error("no people found in this file");
+    treeView.load(tree);
+    $("tree-file").textContent = file.name;
+    setStatus(`Opened ${file.name}: ${tree.INDI.length} people. Search for a person to draw the tree.`);
+  } catch (error) {
+    setStatus("Error: " + lastLine(error));
+  }
+}
+$("tree-open").addEventListener("click", () => $("tree-file-input").click());
+$("tree-file-input").addEventListener("change", () => {
+  if ($("tree-file-input").files[0]) loadTreeFile($("tree-file-input").files[0]);
+  $("tree-file-input").value = "";
+});
+
+// Start --------------------------------------------------------------
+startPython().then((python) => {
+  state.python = python;
+  $("open").disabled = false;
+  $("tree-open").disabled = false;
+  $("python").textContent = "Python: ready";
+  $("version").textContent = "v" + python.version;
+  setStatus("Ready. Open an .ftz file.");
 }).catch((error) => {
-  status.textContent = "Could not start: " + lastLine(error) +
-    ". If you opened this file directly, serve the repo instead: python3 -m http.server, then open http://localhost:8000/web/";
+  $("python").textContent = "Python: failed";
+  setStatus("Could not start: " + lastLine(error) +
+    ". If you opened this file directly, serve the repo instead: python3 -m http.server, then open http://localhost:8000/web/");
 });
 </script>
 </body>
