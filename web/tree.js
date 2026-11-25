@@ -425,12 +425,25 @@
       el.sizer.style.width = state.layout.width * state.zoom + "px";
       el.sizer.style.height = state.layout.height * state.zoom + "px";
     }
+    // Next step up or down from the current zoom (which may be an in-between "fit" value).
     const stepZoom = (step) => {
-      const i = ZOOMS.indexOf(state.zoom);
-      setZoom(ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, i + step))]);
+      const next = step > 0 ? ZOOMS.find((z) => z > state.zoom + 1e-6)
+                            : [...ZOOMS].reverse().find((z) => z < state.zoom - 1e-6);
+      if (next) setZoom(next);
     };
+    // Zoom out (or in) so the whole tree fits in the window.
+    function fitToWindow() {
+      if (!state.layout) return;
+      const vp = el.viewport;
+      state.zoom = Math.max(0.02, Math.min(ZOOMS[ZOOMS.length - 1],
+        (vp.clientWidth - 4) / state.layout.width, (vp.clientHeight - 4) / state.layout.height));
+      applyZoom();
+      vp.scrollLeft = 0;
+      vp.scrollTop = 0;
+    }
     el.zoomIn.addEventListener("click", () => stepZoom(1));
     el.zoomOut.addEventListener("click", () => stepZoom(-1));
+    el.zoomFit.addEventListener("click", fitToWindow);
 
     // Drag the background to move around ---------------------------------
     let drag = null;

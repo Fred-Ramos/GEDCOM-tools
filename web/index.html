@@ -132,7 +132,7 @@
   .tree-empty { padding: 4px 0; color: var(--muted); }
   .tree-viewport { flex: 1; min-height: 200px; overflow: auto; background: var(--white); cursor: grab; touch-action: none; }
   .tree-viewport.panning { cursor: grabbing; }
-  .tree-sizer { position: relative; }
+  .tree-sizer { position: relative; margin: 0 auto; }   /* centred when smaller than the window */
   .tree-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
   .tree-stage svg { position: absolute; left: 0; top: 0; }
   .tree-stage path { fill: none; stroke: var(--black); stroke-width: 1; shape-rendering: crispEdges; }
@@ -233,6 +233,7 @@
         <button id="zoom-out" class="small" aria-label="Zoom out">&minus;</button>
         <div class="field" id="zoom-label">100%</div>
         <button id="zoom-in" class="small" aria-label="Zoom in">+</button>
+        <button id="zoom-fit" class="small" title="Zoom to show the entire tree">Fit to max</button>
         <span class="legend" aria-hidden="true">
           <span><i class="root"></i>Chosen</span><span><i class="ancestor"></i>Ancestor</span>
           <span><i class="relative"></i>Relative</span><span><i class="spouse"></i>Spouse</span>
@@ -425,7 +426,7 @@ win.addEventListener("drop", (event) => {
 const treeView = FamilyTree.create({
   search: $("tree-search"), matches: $("tree-matches"), empty: $("tree-empty"),
   viewport: $("tree-viewport"), sizer: $("tree-sizer"), stage: $("tree-stage"),
-  zoomIn: $("zoom-in"), zoomOut: $("zoom-out"), zoomLabel: $("zoom-label"),
+  zoomIn: $("zoom-in"), zoomOut: $("zoom-out"), zoomFit: $("zoom-fit"), zoomLabel: $("zoom-label"),
 }, { onStatus: setStatus });
 
 // The tree reads the file converted in the first tab, or any .ged / .json chosen here.
