@@ -28,7 +28,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from gedcom_tools.converter import collect_photos, write_outputs  # noqa: E402
 
 INDI_EVENTS = {"BIRT", "BAPM", "DEAT", "BURI", "RESI"}
-FAM_EVENTS = {"MARR"}
+FAM_EVENTS = {"MARR", "DIV"}      # DIV: a "Y" from the app is replaced by the details
 EVENT_FIELDS = ("DATE", "PLAC", "CAUS")
 INDI_ORDER = ["_PDEF", "NAME", "SEX", "BIRT", "BAPM", "RESI", "OCCU", "DEAT", "BURI", "FAMC", "FAMS", "NOTE"]
 FAM_ORDER = ["_PDEF", "HUSB", "WIFE", "MARR", "DIV", "CHIL"]

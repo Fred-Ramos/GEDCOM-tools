@@ -1,6 +1,6 @@
 ---
 name: gedcom-notes
-description: Interpret the free-text NOTE of each individual in a GEDCOM JSON (made from a Quick Family Tree .ftz) and turn it into real GEDCOM records - BIRT, BAPM, DEAT (with CAUS), BURI, RESI, OCCU on individuals and MARR on families - then write the processed .json and .zip (.ged + photos). Use when the user wants to extract, interpret or structure family-tree notes, add marriages from notes, or enrich a .ged/.json/.ftz tree.
+description: Interpret the free-text NOTE of each individual in a GEDCOM JSON (made from a Quick Family Tree .ftz) and turn it into real GEDCOM records - BIRT, BAPM, DEAT (with CAUS), BURI, RESI, OCCU on individuals and MARR, DIV (divorce) on families - then write the processed .json and .zip (.ged + photos). Use when the user wants to extract, interpret or structure family-tree notes, add marriages from notes, or enrich a .ged/.json/.ftz tree.
 ---
 
 # GEDCOM notes → GEDCOM records

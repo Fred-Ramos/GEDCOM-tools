@@ -20,6 +20,7 @@ ambiguous, leave it in the note. Lost information is worse than an unextracted n
 | Profissão: X, lavrador, doméstica, advogado, militar, padre, negociante… | `OCCU` | individual |
 | Morador em X, residente em X, vivia em X | `RESI` `PLAC` (and `DATE`) | individual |
 | Casou/casaram em X a DATE, casamento em X | `MARR` `DATE` / `PLAC` | **family** |
+| Divorciou-se/divorciado/divórcio a DATE em X | `DIV` `DATE` / `PLAC` | **family** |
 
 "Natural e batizada a 19/08/1832 em São Pedro" gives both `BIRT.PLAC` and
 `BAPM` (`DATE` + `PLAC`) with the same place.
@@ -34,6 +35,13 @@ birth keyword.
 "Brasileiro/Brasileira" → `BIRT.PLAC` "Brazil"; "Português/Portuguesa" → "Portugal";
 "Espanhol/Espanhola" → "Spain". Only when no more specific birthplace is known
 (neither in the note nor in `existing.BIRT.PLAC`).
+
+## Divorce (DIV) - goes on the FAM record
+Pick the family like a marriage (below): the spouse named in the note, the only family, or, when the
+person has several, the one already marked divorced (`DIV` "Y" from the app). A "Y" is replaced by
+the date/place. A legal separation ("separação de pessoas e bens") is **not** a divorce: leave it in
+the note. Example (invented): "Divorciada de Rui a 02/03/1950 em Lisboa" →
+`"families": {"@F0123@": {"DIV": {"DATE": "2 Mar 1950", "PLAC": "Lisboa"}}}`.
 
 ## Marriage (MARR) - goes on the FAM record
 1. Pick the family from the entry's `families` list:
@@ -108,7 +116,7 @@ One `patch_NNN.json` per `batch_NNN.json`:
 ```
 
 Allowed: individuals → `BIRT BAPM DEAT BURI RESI` (objects with `DATE PLAC CAUS`),
-`OCCU` (string or list), `NOTE` (string or null); families → `MARR` (`DATE PLAC`).
+`OCCU` (string or list), `NOTE` (string or null); families → `MARR`, `DIV` (`DATE PLAC`).
 
 ## Worked examples
 

@@ -142,7 +142,9 @@
         const husband = pointer(f.HUSB);
         return { id: famId, wife: info.has(wife) ? wife : null, husband: info.has(husband) ? husband : null,
                  children: birthOrder(asList(f.CHIL).map(ref)),
-                 marriage: { year: yearOf(f.MARR), place: placeOf(f.MARR) } };
+                 marriage: { year: yearOf(f.MARR), place: placeOf(f.MARR) },
+                 // DIV is "Y" (divorced, no details) or an event with DATE/PLAC.
+                 divorce: f.DIV ? { year: yearOf(f.DIV), place: placeOf(f.DIV) } : null };
       },
 
       families: () => [...families.keys()],

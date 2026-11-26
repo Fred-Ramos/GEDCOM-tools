@@ -22,21 +22,24 @@
   const LABELS = {
     pt: {
       title: "Livro de Família", contents: "Índice geral", index: "Índice onomástico", family: "Família",
-      otherFamilies: "Outras famílias", second: "2.º casamento", people: "pessoas", families: "famílias",
+      otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, divorced: "div.",
+      people: "pessoas", families: "famílias",
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
         "→ p. página onde está a entrada completa ou a continuação da família.",
         "◄ p. página onde estão os pais do cônjuge.   ↑ p. página onde a pessoa aparece como filho/a.",
-        "* nascimento ou batismo   † morte ou enterro   ∞ casamento   ? pessoa desconhecida"],
+        "* nascimento ou batismo   † morte ou enterro   ∞ casamento (∞¹ ∞² ordem)   div. divórcio   ? desconhecido"],
     },
     en: {
       title: "Family Book", contents: "Contents", index: "Index of names", family: "Family",
-      otherFamilies: "Other families", second: "2nd marriage", people: "people", families: "families",
+      otherFamilies: "Other families", divorced: "div.",
+      marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
+      people: "people", families: "families",
       made: "Made on", noSurname: "no surname", how: "How to read", howText: [
         "Every person has one full entry, with their number in square brackets [no.].",
         "→ p. page with the full entry, or where the family continues.",
         "◄ p. page with the spouse's parents.   ↑ p. page where the person appears as a child.",
-        "* birth or baptism   † death or burial   ∞ marriage   ? unknown person"],
+        "* birth or baptism   † death or burial   ∞ marriage (∞¹ ∞² order)   div. divorced   ? unknown"],
     },
   };
 
@@ -96,12 +99,20 @@
     const measure = makeMeasure(options.measure);
 
     // ---- Where everything belongs ----------------------------------------------------
-    const firstFamily = new Map();                 // person -> the family holding their full entry
+    // Each person's unions in time order (by marriage year when all are known, otherwise as recorded).
+    const unionsOf = new Map();
     for (const pid of idx.people()) {
-      const u = idx.unions(pid).find((x) => fam.has(x.famId));
-      if (u) firstFamily.set(pid, u.famId);
+      const list = idx.unions(pid).map((u) => u.famId).filter((id) => fam.has(id));
+      if (list.length > 1 && list.every((id) => fam.get(id).marriage.year)) {
+        list.sort((x, y) => Number(fam.get(x).marriage.year) - Number(fam.get(y).marriage.year));
+      }
+      if (list.length) unionsOf.set(pid, list);
     }
+    const unionNo = (pid, F) => { const list = unionsOf.get(pid) || []; return list.length > 1 ? list.indexOf(F) + 1 : 0; };
+    // The full entry is with the first union.
+    const firstFamily = new Map([...unionsOf].map(([pid, list]) => [pid, list[0]]));
     const placedUnder = new Map();                 // "parentFamily|child" -> [families of that child]
+    const placementOf = new Map();                 // family -> { pf, via }
     const roots = [];
     for (const [id, f] of fam) {
       let placed = null;
@@ -110,6 +121,7 @@
         if (pf && fam.has(pf) && fam.get(pf).children.includes(via)) { placed = { pf, via }; break; }
       }
       if (placed) {
+        placementOf.set(id, placed);
         const key = `${placed.pf}|${placed.via}`;
         if (!placedUnder.has(key)) placedUnder.set(key, []);
         placedUnder.get(key).push(id);
@@ -117,6 +129,15 @@
         roots.push(id);
       }
     }
+    // A person's unions drawn under their parents are stacked in time order.
+    for (const [key, list] of placedUnder) {
+      const via = key.slice(key.indexOf("|") + 1);
+      list.sort((x, y) => unionNo(via, x) - unionNo(via, y));
+    }
+    const stackedTogether = (F, G) => {
+      const a = placementOf.get(F), b = placementOf.get(G);
+      return !!(a && b && a.pf === b.pf && a.via === b.via);
+    };
     const viaFams = (F, c) => placedUnder.get(`${F}|${c}`) || [];
     const below = (F) => fam.get(F).children.flatMap((c) => viaFams(F, c));
     const famCount = new Map();
@@ -190,6 +211,12 @@
       return [row(parts[0], {}, markers), row(parts[1])];
     }
 
+    const sup = (n) => (n ? String(n).replace(/\d/g, (d) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]) : "");
+    const divorceText = (F) => {
+      const dv = fam.get(F).divorce;
+      return dv ? ` · ${L.divorced}${dv.year ? ` ${dv.year}` : ""}` : "";
+    };
+
     const contentCache = new Map();
     function contents(b) {
       const key = b.type === "couple" ? `c|${b.fam}|${b.a}|${b.second}|${b.d === 0}`
@@ -210,26 +237,40 @@
         const up = b.d === 0 && idx.parentFamily(b.a) ? goto("↑ p.", () => childPage(b.a)) : null;
         const markB = b.b ? (fullB ? num(b.b) : goto("→ p.", () => fullPage(b.b))) : null;
         const spouseParents = b.b && idx.parentFamily(b.b) ? goto("◄ p.", () => childPage(b.b)) : null;
-        const nameA = b.second && !fullA ? `${displayName(b.a)} (${L.second})` : displayName(b.a);
+        const n = unionNo(b.a, b.fam);
+        const nameA = b.second && !fullA ? `${displayName(b.a)} (${L.marriageNo(n)})` : displayName(b.a);
         const married = level !== "compact" && f.marriage.year ? `${f.marriage.year} ` : "";
-        const nameB = b.b ? `∞ ${married}${displayName(b.b)}` : "∞ ?";
+        const nameB = `∞${sup(n)} ${married}${b.b ? displayName(b.b) : "?"}${divorceText(b.fam)}`;
+        // At a full entry, every other union of that person that is not stacked right here.
+        const otherUnions = (pid) => (unionsOf.get(pid) || [])
+          .filter((G) => G !== b.fam && !stackedTogether(G, b.fam))
+          .map((G) => {
+            const g = fam.get(G);
+            const spouse = g.husband === pid ? g.wife : g.husband;
+            return row(`∞${sup(unionNo(pid, G))} ${spouse ? displayName(spouse) : "?"}${divorceText(G)}`,
+                       { color: "#444" }, [goto("→ p.", () => famPage.get(G))]);
+          });
         if (level === "compact") {
-          seg(b.a, false, [row(`${nameA} ${fullA ? yearsText(b.a) : ""}`.trim(), { bold: true }, [markA, up])]);
-          seg(b.b, false, [row(`${nameB} ${fullB ? yearsText(b.b) : ""}`.trim(), {}, [markB, spouseParents])]);
+          seg(b.a, false, [row(`${nameA} ${fullA ? yearsText(b.a) : ""}`.trim(), { bold: true }, [markA, up]),
+                           ...(fullA ? otherUnions(b.a) : [])]);
+          seg(b.b, false, [row(`${nameB} ${fullB ? yearsText(b.b) : ""}`.trim(), {}, [markB, spouseParents]),
+                           ...(fullB ? otherUnions(b.b) : [])]);
         } else {
           seg(b.a, fullA, [row(nameA, { bold: true }, [markA]),
                            ...(fullA ? lifeRows(b.a, [up], framed) : up ? [row("", {}, [up])] : []),
-                           ...(fullA ? occupation(b.a) : [])]);
+                           ...(fullA ? occupation(b.a) : []),
+                           ...(fullA ? otherUnions(b.a) : [])]);
           seg(b.b, !!fullB, [row(nameB, { bold: !!b.b }, [markB]),
                              ...(fullB ? lifeRows(b.b, [spouseParents], framed) : spouseParents ? [row("", {}, [spouseParents])] : []),
-                             ...(fullB ? occupation(b.b) : [])]);
+                             ...(fullB ? occupation(b.b) : []),
+                             ...(fullB ? otherUnions(b.b) : [])]);
         }
       } else if (b.type === "single") {
         if (level === "compact") seg(b.pid, false, [row(`${displayName(b.pid)} ${yearsText(b.pid)}`.trim(), { bold: true }, [num(b.pid)])]);
         else seg(b.pid, true, [row(displayName(b.pid), { bold: true }, [num(b.pid)]), ...lifeRows(b.pid, [], framed), ...occupation(b.pid)]);
       } else {
         const target = b.kind === "cut" ? goto("→ p.", () => famPage.get(b.fam)) : goto("→ p.", () => fullPage(b.pid));
-        const name = b.second ? `${displayName(b.pid)} (${L.second})` : displayName(b.pid);
+        const name = b.second ? `${displayName(b.pid)} (${L.marriageNo(unionNo(b.pid, b.fam))})` : displayName(b.pid);
         const style = { italic: true, color: "#444" };
         if (level === "compact") seg(b.pid, false, [row(`${name} ${yearsText(b.pid)}`.trim(), style, [target])]);
         else seg(b.pid, false, [row(name, style, [num(b.pid)]), row(yearsText(b.pid), { color: "#444" }, [target])]);
@@ -380,7 +421,11 @@
                                        : 'fill="#ffffff" stroke="#555" stroke-width="0.25"';
       let s = `<rect x="${f2(x)}" y="${f2(y)}" width="${BW}" height="${f2(b.h)}" ${style}/>`;
       let top = y + PAD / 2;
-      for (const seg of contents(b).segments) {
+      contents(b).segments.forEach((seg, segIndex) => {
+        if (segIndex === 1 && b.type === "couple") {
+          // A thin line between the two people of the couple.
+          s += `<line x1="${f2(x + 0.6)}" y1="${f2(top - 0.25)}" x2="${f2(x + BW - 0.6)}" y2="${f2(top - 0.25)}" stroke="#bbb" stroke-width="0.2"/>`;
+        }
         if (seg.photo) {
           // A portrait frame: the photo if there is one, otherwise empty space for it.
           const fx = x + 1, fy = top + 0.3;
@@ -404,7 +449,7 @@
           }
         });
         top += seg.photo ? Math.max(seg.lines.length * LH, PH + 0.8) : seg.lines.length * LH;
-      }
+      });
       return s;
     }
 
