@@ -48,7 +48,9 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   `OBJE` photo when available (converted .ftz, or "Add photos…" matched by file name), empty otherwise.
   Unions: each person's unions in time order (∞¹ ∞² …); the full entry is with the first; unions drawn
   under the same parents are stacked (each with its own children), and the full entry lists every
-  other union with "→ p."; divorces show as "· div." (+ year). Couple boxes have a thin dividing line.
+  other union with "→ p."; a GEDCOM DIV shows as "· sep." (separated, + year), because a couple may
+  have split without marrying. A remarried person's unions always stay together: all hang with that
+  person and move to a continuation page as one block. Couple boxes have a thin dividing line.
   Text is never cut: each line is measured (canvas in the browser, an estimate in Node), shrunk to at most
   86% if slightly too long, otherwise wrapped; birth and death get one line each when they don't fit
   together. Box heights come from the measured text, so page breaks use real heights.

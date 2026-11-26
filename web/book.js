@@ -22,24 +22,24 @@
   const LABELS = {
     pt: {
       title: "Livro de Família", contents: "Índice geral", index: "Índice onomástico", family: "Família",
-      otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, divorced: "div.",
+      otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
       people: "pessoas", families: "famílias",
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
         "→ p. página onde está a entrada completa ou a continuação da família.",
         "◄ p. página onde estão os pais do cônjuge.   ↑ p. página onde a pessoa aparece como filho/a.",
-        "* nascimento ou batismo   † morte ou enterro   ∞ casamento (∞¹ ∞² ordem)   div. divórcio   ? desconhecido"],
+        "* nascimento ou batismo   † morte ou enterro   ∞ casamento (∞¹ ∞² ordem)   sep. separados   ? desconhecido"],
     },
     en: {
       title: "Family Book", contents: "Contents", index: "Index of names", family: "Family",
-      otherFamilies: "Other families", divorced: "div.",
+      otherFamilies: "Other families", separated: "sep.",
       marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
       people: "people", families: "families",
       made: "Made on", noSurname: "no surname", how: "How to read", howText: [
         "Every person has one full entry, with their number in square brackets [no.].",
         "→ p. page with the full entry, or where the family continues.",
         "◄ p. page with the spouse's parents.   ↑ p. page where the person appears as a child.",
-        "* birth or baptism   † death or burial   ∞ marriage (∞¹ ∞² order)   div. divorced   ? unknown"],
+        "* birth or baptism   † death or burial   ∞ marriage (∞¹ ∞² order)   sep. separated   ? unknown"],
     },
   };
 
@@ -111,42 +111,47 @@
     const unionNo = (pid, F) => { const list = unionsOf.get(pid) || []; return list.length > 1 ? list.indexOf(F) + 1 : 0; };
     // The full entry is with the first union.
     const firstFamily = new Map([...unionsOf].map(([pid, list]) => [pid, list[0]]));
-    const placedUnder = new Map();                 // "parentFamily|child" -> [families of that child]
-    const placementOf = new Map();                 // family -> { pf, via }
-    const roots = [];
-    for (const [id, f] of fam) {
-      let placed = null;
-      for (const via of [f.husband, f.wife]) {
-        const pf = via && idx.parentFamily(via);
-        if (pf && fam.has(pf) && fam.get(pf).children.includes(via)) { placed = { pf, via }; break; }
-      }
-      if (placed) {
-        placementOf.set(id, placed);
-        const key = `${placed.pf}|${placed.via}`;
-        if (!placedUnder.has(key)) placedUnder.set(key, []);
-        placedUnder.get(key).push(id);
-      } else {
-        roots.push(id);
-      }
-    }
-    // A person's unions drawn under their parents are stacked in time order.
-    for (const [key, list] of placedUnder) {
-      const via = key.slice(key.indexOf("|") + 1);
-      list.sort((x, y) => unionNo(via, x) - unionNo(via, y));
-    }
-    const stackedTogether = (F, G) => {
-      const a = placementOf.get(F), b = placementOf.get(G);
-      return !!(a && b && a.pf === b.pf && a.via === b.via);
+    // Where each family hangs. A person with several unions keeps them all together: every one of
+    // their unions hangs with that person (under their parents, or as one root group). Otherwise a
+    // family hangs under the husband's parents, else the wife's; with neither it is a root.
+    // The unit for placement and page breaks is a group: one person's unions, stacked in time order.
+    const parentsOf = (pid) => {
+      const pf = pid && idx.parentFamily(pid);
+      return pf && fam.has(pf) && fam.get(pf).children.includes(pid) ? pf : null;
     };
-    const viaFams = (F, c) => placedUnder.get(`${F}|${c}`) || [];
+    const remarried = (pid) => !!pid && (unionsOf.get(pid) || []).length > 1;
+    const groups = new Map();                      // group key -> families
+    const groupOf = new Map();                     // family -> group key
+    const groupVia = new Map();                    // group key -> the person written first in its boxes
+    for (const [id, f] of fam) {
+      const spouses = [f.husband, f.wife].filter(Boolean);
+      const keeper = spouses.find(remarried);
+      let key, via;
+      if (keeper) {
+        via = keeper;
+        key = parentsOf(keeper) ? `${parentsOf(keeper)}|${keeper}` : `root|${keeper}`;
+      } else {
+        via = spouses.find(parentsOf) || null;
+        key = via ? `${parentsOf(via)}|${via}` : `root|${id}`;
+      }
+      groupOf.set(id, key);
+      if (!groupVia.has(key)) groupVia.set(key, via || f.husband || f.wife);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(id);
+    }
+    for (const [key, list] of groups) list.sort((x, y) => unionNo(groupVia.get(key), x) - unionNo(groupVia.get(key), y));
+    const stackedTogether = (F, G) => groupOf.get(F) === groupOf.get(G);
+    const viaFams = (F, c) => groups.get(`${F}|${c}`) || [];
     const below = (F) => fam.get(F).children.flatMap((c) => viaFams(F, c));
     const famCount = new Map();
     const countFams = (F) => {
       if (!famCount.has(F)) famCount.set(F, 1 + below(F).reduce((s, G) => s + countFams(G), 0));
       return famCount.get(F);
     };
-    roots.forEach(countFams);
-    roots.sort((a, b) => countFams(b) - countFams(a) || fam.get(b).children.length - fam.get(a).children.length);
+    const groupSize = (key) => groups.get(key).reduce((sum, F) => sum + countFams(F), 0);
+    const groupChildren = (key) => groups.get(key).reduce((sum, F) => sum + fam.get(F).children.length, 0);
+    const roots = [...groups.keys()].filter((k) => k.startsWith("root|"));
+    roots.sort((a, b) => groupSize(b) - groupSize(a) || groupChildren(b) - groupChildren(a));
 
     // ---- What each box says (measured, wrapped; independent of page numbers) ---------
     const info = (pid) => idx.info(pid);
@@ -214,7 +219,8 @@
     const sup = (n) => (n ? String(n).replace(/\d/g, (d) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]) : "");
     const divorceText = (F) => {
       const dv = fam.get(F).divorce;
-      return dv ? ` · ${L.divorced}${dv.year ? ` ${dv.year}` : ""}` : "";
+      // Shown as "separated": a couple may have split without ever marrying.
+      return dv ? ` · ${L.separated}${dv.year ? ` ${dv.year}` : ""}` : "";
     };
 
     const contentCache = new Map();
@@ -234,7 +240,7 @@
         const fullA = firstFamily.get(b.a) === b.fam;
         const fullB = b.b && firstFamily.get(b.b) === b.fam;
         const markA = fullA ? num(b.a) : goto("→ p.", () => fullPage(b.a));
-        const up = b.d === 0 && idx.parentFamily(b.a) ? goto("↑ p.", () => childPage(b.a)) : null;
+        const up = b.d === 0 && !b.second && idx.parentFamily(b.a) ? goto("↑ p.", () => childPage(b.a)) : null;
         const markB = b.b ? (fullB ? num(b.b) : goto("→ p.", () => fullPage(b.b))) : null;
         const spouseParents = b.b && idx.parentFamily(b.b) ? goto("◄ p.", () => childPage(b.b)) : null;
         const n = unionNo(b.a, b.fam);
@@ -294,22 +300,26 @@
       const anchors = [];
       if (d < COLS - 1) {
         for (const c of f.children) {
+          const groupKey = `${F}|${c}`;
           const placed = viaFams(F, c);
           if (placed.length) {
-            placed.forEach((G, i) => {
-              if (d + 1 === COLS - 1 && fam.get(G).children.length) cut.add(G);   // no room for its children
-              if (cut.has(G)) {
-                const box = { type: "short", kind: "cut", pid: c, fam: G, second: i > 0, d: d + 1, y };
-                box.h = contents(box).h;
-                if (out) out.push(box);
-                anchors.push(y);
-                y += box.h + GAP;
-              } else {
+            // A person's unions move together: if one needs a new page, they all go.
+            if (d + 1 === COLS - 1 && placed.some((G) => fam.get(G).children.length)) cut.add(groupKey);
+            if (cut.has(groupKey)) {
+              const box = { type: "short", kind: "cut", pid: c, fam: placed[0], group: groupKey, d: d + 1, y };
+              box.h = contents(box).h;
+              if (out) out.push(box);
+              anchors.push(y);
+              y += box.h + GAP;
+            } else {
+              const start = y;
+              placed.forEach((G, i) => {
                 const h = place(G, d + 1, y, out, c, i > 0, heights);
                 anchors.push(y);
                 y += h + GAP;
-              }
-            });
+              });
+              if (heights) heights.set(groupKey, y - GAP - start);
+            }
           } else {
             const box = !firstFamily.has(c)
               ? { type: "single", pid: c, d: d + 1, y }
@@ -322,18 +332,23 @@
         }
       }
       if (out && anchors.length) out.push({ type: "bracket", d, from: top, anchors });
-      const h = Math.max(couple.h, anchors.length ? y - GAP - top : 0);
-      if (heights) heights.set(F, h);
-      return h;
+      return Math.max(couple.h, anchors.length ? y - GAP - top : 0);
     }
 
-    // Cut the largest branches until the chart fits on a page.
+    // A chart starts with one group: a couple, or one person's unions stacked.
+    function placeChart(key, top, out, heights) {
+      let y = top;
+      groups.get(key).forEach((F, i) => { y += place(F, 0, y, out, groupVia.get(key), i > 0, heights) + GAP; });
+      return y - GAP - top;
+    }
+
+    // Cut the largest branches (whole groups) until the chart fits on a page.
     function fitChart(R, extra) {
       for (let guard = 0; guard < 1000; guard++) {
         const heights = new Map();
-        const h = place(R, 0, 0, null, null, false, heights) + extra;
+        const h = placeChart(R, 0, null, heights) + extra;
         if (h <= BODY) return h;
-        const candidates = [...heights].filter(([F]) => F !== R && fam.get(F).children.length)
+        const candidates = [...heights].filter(([k]) => k !== R && groups.get(k).some((F) => fam.get(F).children.length))
                                        .sort((x, y) => y[1] - x[1]);
         if (!candidates.length) return h;
         cut.add(candidates[0][0]);
@@ -343,14 +358,14 @@
 
     // Charts in reading order: each root, then (depth first) the branches cut from it.
     const charts = [];
-    const chapterRoots = new Set(roots.filter((R) => countFams(R) >= 3));
+    const chapterRoots = new Set(roots.filter((R) => groupSize(R) >= 3));
     function emit(R, isRoot) {
       const caption = isRoot && chapterRoots.has(R);
       const h = fitChart(R, caption ? CAPTION : 0);
       charts.push({ root: R, h, caption, isRoot });
       const out = [];
-      place(R, 0, 0, out);
-      for (const b of out) if (b.type === "short" && b.kind === "cut") emit(b.fam, false);
+      placeChart(R, 0, out);
+      for (const b of out) if (b.type === "short" && b.kind === "cut") emit(b.group, false);
     }
     roots.forEach((R) => emit(R, true));
 
@@ -377,7 +392,7 @@
     const famPage = new Map();
     for (const c of charts) {
       c.boxes = [];
-      place(c.root, 0, c.caption ? CAPTION : 0, c.boxes);
+      placeChart(c.root, c.caption ? CAPTION : 0, c.boxes);
       for (const b of c.boxes) if (b.type === "couple") famPage.set(b.fam, c.page);
     }
     const fullPage = (pid) => (firstFamily.has(pid) ? famPage.get(firstFamily.get(pid))
@@ -458,8 +473,7 @@
       const y0 = MT + c.y;
       let s = "";
       if (c.caption) {
-        const f = fam.get(c.root);
-        const head = f.husband || f.wife;
+        const head = groupVia.get(c.root);
         const surname = head && info(head).surname;
         s += `<text x="${ML}" y="${f2(y0 + 4.2)}" font-size="3.6" font-weight="bold" fill="#3a2a18">` +
              `${esc(`${L.family} ${surname || (head ? info(head).name : "?")}`)}</text>` +
@@ -537,7 +551,7 @@
     const toc = [];
     for (const c of charts) {
       if (c.caption) {
-        const f = fam.get(c.root);
+        const f = fam.get(groups.get(c.root)[0]);
         const names = [f.husband, f.wife].filter(Boolean).map((x) => info(x).name).join(" & ");
         const head = f.husband || f.wife;
         const surname = head && info(head).surname;
@@ -570,6 +584,7 @@
     const full = [...appearances].filter(([, m]) => [...m.values()].some(Boolean)).length;
     return {
       pages,
+      familyPages: Object.fromEntries(famPage),     // family id -> page (for tests and checks)
       stats: {
         people: idx.people().length, families: fam.size, pages: pages.length, chartPages: chartSvgs.length,
         indexPages: indexSvgs.length, chapters: chapterRoots.size, charts: charts.length,
