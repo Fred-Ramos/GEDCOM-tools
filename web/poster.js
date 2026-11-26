@@ -40,6 +40,8 @@
   }
 
   function titleLines(title) {
+    // "|" forces a line break, e.g. "Ramos AP | da Cunha Ramos".
+    if (String(title).includes("|")) return title.split("|").map((l) => l.trim()).filter(Boolean).slice(0, 3);
     const words = String(title || "").split(/\s+/).filter(Boolean);
     if (!words.length) return [];
     if (title.length <= 22) return [title];
@@ -56,7 +58,7 @@
   // Layout
   // ------------------------------------------------------------------
   // upGens: ancestor generations per side (1 = parents). downGens: descendant generations (Infinity = all).
-  function layoutPoster(idx, famId, upGens, downGens, title) {
+  function layoutPoster(idx, famId, upGens, downGens, title, heading = "") {
     const fam = idx.family(famId);
     const boxes = [];
     let lines = "";
@@ -72,7 +74,7 @@
     }
 
     const tLines = titleLines(title);
-    const titleW = Math.max(360, ...tLines.map((l) => l.length * 19 + 90));
+    const titleW = Math.max(360, String(heading).length * 13 + 90, ...tLines.map((l) => l.length * 19 + 90));
     const innerX = Math.max(GAPC / 2 + 1.5 * BW + 60, titleW / 2 + 40 + BW / 2);
 
     // Vertical positions.
@@ -177,7 +179,7 @@
       lines: lines.replace(/M(-?[\d.]+)/g, (m, x) => "M" + f1(Number(x) + half))
                   .replace(/H(-?[\d.]+)/g, (m, x) => "H" + f1(Number(x) + half)),
       couple: { x: half, y: coupleY },
-      title: { lines: tLines, x: half, y: titleTop, w: titleW, h: TITLE_H },
+      title: { heading: String(heading).trim(), lines: tLines, x: half, y: titleTop, w: titleW, h: TITLE_H },
       trunk: { x: half, base: bottom + 110, top: coupleY + BH / 2 + 10 },
     };
   }
@@ -262,14 +264,15 @@
     const curl = (cx, cy, sx, sy) =>
       `<path d="M${f1(cx)} ${f1(cy + sy * 22)}C${f1(cx)} ${f1(cy + sy * 6)} ${f1(cx + sx * 6)} ${f1(cy)} ${f1(cx + sx * 22)} ${f1(cy)}` +
       `M${f1(cx + sx * 8)} ${f1(cy + sy * 8)}m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>`;
+    const first = t.heading ? 92 : 82;
     const surnames = t.lines.map((l, i) =>
-      `<text x="${f1(t.x)}" y="${f1(y + 92 + i * 40 - (t.lines.length - 1) * 16)}" font-size="36" font-style="italic" fill="#3a2a18">${esc(l)}</text>`).join("");
-    return `<g>` +
+      `<text x="${f1(t.x)}" y="${f1(y + first + i * 40 - (t.lines.length - 1) * (t.heading ? 16 : 20))}" font-size="36" font-style="italic" fill="#3a2a18">${esc(l)}</text>`).join("");
+    return `<g class="cartouche">` +
       `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${h}" fill="#fffdf6" fill-opacity="0.92" stroke="#b8a46a" stroke-width="2"/>` +
       `<rect x="${f1(x + 7)}" y="${f1(y + 7)}" width="${f1(w - 14)}" height="${h - 14}" fill="none" stroke="#cdbd8a" stroke-width="0.8"/>` +
       `<g fill="none" stroke="#b8a46a" stroke-width="1.4">${curl(x + 14, y + 14, 1, 1)}${curl(x + w - 14, y + 14, -1, 1)}` +
       `${curl(x + 14, y + h - 14, 1, -1)}${curl(x + w - 14, y + h - 14, -1, -1)}</g>` +
-      `<text x="${f1(t.x)}" y="${f1(y + 44)}" font-size="22" letter-spacing="1" fill="#3a2a18">A Família</text>` +
+      (t.heading ? `<text x="${f1(t.x)}" y="${f1(y + 44)}" font-size="22" letter-spacing="1" fill="#3a2a18">${esc(t.heading)}</text>` : "") +
       surnames + `</g>`;
   }
 

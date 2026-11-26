@@ -31,8 +31,10 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   branch drawing via `FamilyTree.internals`). The couple is in the centre (wife left, husband right);
   descendants open downwards; the wife's ancestors open to the left and the husband's to the right as
   sideways pedigree charts (one generation per column, father above mother, bracket lines, empty boxes
-  for unknown ancestors). A seeded decorative tree grows behind, and an editable "A Família ..." title
-  (default: each spouse's surname, or their father's) sits above the couple. Defaults: 4 generations up,
+  for unknown ancestors). A seeded decorative tree grows behind, and a title sits above the couple: one free
+  text, fully editable (default: each spouse's surname, or their father's; "|" forces a line break).
+  Descendant rows drop until they fit in the lower triangle between the diagonals of the ancestors'
+  rectangle (crossing at the couple) and clear every ancestor box and bracket. Defaults: 4 generations up,
   all down.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 

@@ -810,6 +810,8 @@
 
     // Selecting a person -------------------------------------------------
     el.stage.addEventListener("click", (event) => {
+      // Clicking the poster's title jumps to its text box.
+      if (event.target.closest(".cartouche")) { el.title.focus(); el.title.select(); return; }
       const g = event.target.closest(".person");
       if (!g) return;
       state.selected = g.dataset.id;

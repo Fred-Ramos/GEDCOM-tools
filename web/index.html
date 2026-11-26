@@ -132,6 +132,7 @@
   .tree-empty { padding: 4px 0; color: var(--muted); }
   .selection { padding: 4px 6px; background: var(--white); }
   #tree-title { width: 220px; }
+  .cartouche { cursor: text; }
   .selection label { white-space: nowrap; cursor: pointer; }
   .selection .hint { color: var(--muted); }
   .tree-viewport { flex: 1; min-height: 200px; overflow: auto; background: #e9dec4; cursor: grab; touch-action: none; }
@@ -237,7 +238,7 @@
           <option>1</option><option>2</option><option>3</option><option value="0" selected>All</option>
         </select>
         <label for="tree-title" data-style="2">Title:</label>
-        <input id="tree-title" class="input" data-style="2" type="text" spellcheck="false" placeholder="Surnames">
+        <input id="tree-title" class="input" data-style="2" type="text" spellcheck="false" placeholder="Title (| = new line)" title="Use | to choose where the line breaks">
         <button id="save-png" disabled>Save PNG</button>
         <button id="save-svg" disabled>Save SVG</button>
         <span class="legend" data-style="1">Leaves:<i style="background:#a3ab4c"></i>mother's side<i style="background:#4e8e56"></i>father's side</span>
