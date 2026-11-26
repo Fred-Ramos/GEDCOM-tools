@@ -46,6 +46,9 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   Cover, contents, charts, index of names. No notes are printed. Portuguese or English, three detail
   levels. Every full entry has a portrait photo frame (standard/detailed): filled from the person's
   `OBJE` photo when available (converted .ftz, or "Add photos…" matched by file name), empty otherwise.
+  Text is never cut: each line is measured (canvas in the browser, an estimate in Node), shrunk to at most
+  86% if slightly too long, otherwise wrapped; birth and death get one line each when they don't fit
+  together. Box heights come from the measured text, so page breaks use real heights.
   Pages are SVGs in mm: previewed in the tab and printed with the browser's Print / Save as PDF.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 

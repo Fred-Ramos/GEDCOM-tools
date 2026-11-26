@@ -47,13 +47,37 @@
   const PW = 8.5, PH = 10.5;                  // photo frame beside each full entry
   const LH = 3.0, PAD = 1.5, GAP = 1.6, TREE_GAP = 7, CAPTION = 7;
   const FONT = 2.3, FONT_NAME = 2.45, FONT_SMALL = 1.9;
-  const CHARS = 32;                           // characters per box line at FONT (kept safe for wide fonts)
-  const CHARS_PHOTO = 25;                     // ... when a photo frame takes part of the box
-  const LINES = {
-    compact: { single: 1, couple: 2, short: 1 },
-    standard: { single: 2, couple: 4, short: 2 },
-    detailed: { single: 3, couple: 6, short: 2 },
-  };
+  const LEVELS = ["compact", "standard", "detailed"];
+  const MIN_SCALE = 0.86;                     // a line may shrink this much before it wraps instead
+
+  // Text width in mm. In the browser it is measured on a canvas with the page's own fonts; elsewhere
+  // (tests, Node) it is estimated, a little generously.
+  function estimateWidth(text, size, bold) {
+    let w = 0;
+    for (const ch of text) {
+      w += /[il.,;:'|!jtfI()[\] ]/.test(ch) ? 0.3 : /[mwMW]/.test(ch) ? 0.86 :
+           /[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9∞†*→↑◄]/.test(ch) ? 0.66 : 0.55;
+    }
+    return w * size * (bold ? 1.08 : 1);
+  }
+  function makeMeasure(custom) {
+    if (custom) return custom;
+    try {
+      const ctx = typeof document !== "undefined" && document.createElement("canvas").getContext("2d");
+      if (ctx && ctx.measureText) {
+        const cache = new Map();
+        return (text, size, bold, italic) => {
+          const key = `${bold ? 1 : 0}${italic ? 1 : 0}${text}`;
+          if (!cache.has(key)) {
+            ctx.font = `${italic ? "italic " : ""}${bold ? "bold " : ""}100px Georgia, "Times New Roman", serif`;
+            cache.set(key, ctx.measureText(text).width / 100);
+          }
+          return cache.get(key) * size;
+        };
+      }
+    } catch (e) { /* no canvas: estimate */ }
+    return estimateWidth;
+  }
 
   const fit = (text, max) => (text.length > max ? text.slice(0, Math.max(1, max - 1)) + "…" : text);
   const f2 = (v) => Math.round(v * 100) / 100;
@@ -61,17 +85,15 @@
 
   function buildBook(tree, options = {}) {
     const lang = LABELS[options.lang] ? options.lang : "pt";
-    const level = LINES[options.level] ? options.level : "standard";
+    const level = LEVELS.includes(options.level) ? options.level : "standard";
     const L = LABELS[lang];
     const title = (options.title || "").trim() || L.title;
     const idx = T.indexTree(tree);
     const fam = new Map(idx.families().map((id) => [id, idx.family(id)]));
-    const lines = LINES[level];
     // Photo frames: in standard and detailed books, unless turned off. photoFor(id) gives an image URL.
     const framed = options.photos !== false && level !== "compact";
     const photoFor = options.photoFor || (() => null);
-    const segH = (rows) => (framed ? Math.max(rows * LH, PH + 0.8) : rows * LH);
-    const H = { single: segH(lines.single) + PAD, couple: 2 * segH(lines.couple / 2) + PAD, short: lines.short * LH + PAD };
+    const measure = makeMeasure(options.measure);
 
     // ---- Where everything belongs ----------------------------------------------------
     const firstFamily = new Map();                 // person -> the family holding their full entry
@@ -105,13 +127,128 @@
     roots.forEach(countFams);
     roots.sort((a, b) => countFams(b) - countFams(a) || fam.get(b).children.length - fam.get(a).children.length);
 
+    // ---- What each box says (measured, wrapped; independent of page numbers) ---------
+    const info = (pid) => idx.info(pid);
+    const displayName = (pid) => {
+      const p = info(pid);
+      return level !== "compact" && p.nick ? `${p.name} '${p.nick}'` : p.name;
+    };
+    const lifeParts = (pid) => {
+      const p = info(pid);
+      const part = (sign, e) => (e.year || e.place ? `${sign} ${[e.year, shortPlace(e.place)].filter(Boolean).join(" ")}` : "");
+      return [part("*", p.birth), part("†", p.death)].filter(Boolean);
+    };
+    const yearsText = (pid) => (info(pid).years ? `(${info(pid).years})` : "");
+
+    // Markers on the right of a line: a person's number, or a page reference (resolved when drawing).
+    const digits = String(idx.people().length).length;
+    const num = (pid) => ({ type: "num", pid });
+    const goto = (sign, to) => ({ type: "ref", sign, to });
+    const markerWidth = (m) => measure(m.type === "num" ? `[${"8".repeat(digits)}]` : `${m.sign} 888`, FONT_SMALL) + 1.8;
+    const row = (text, style = {}, markers = []) => ({ text: text || "", style, markers: markers.filter(Boolean) });
+
+    // Fit one text into a first line of `firstWidth` mm and further lines of `width` mm:
+    // as it is, slightly smaller, or wrapped onto more lines. Never cut.
+    function wrapText(text, size, bold, italic, firstWidth, width) {
+      const w = measure(text, size, bold, italic);
+      if (w <= firstWidth) return [{ text, size }];
+      if (w * MIN_SCALE <= firstWidth) return [{ text, size: size * firstWidth / w }];
+      const out = [];
+      let line = "";
+      for (const word of text.split(" ")) {
+        const next = line ? `${line} ${word}` : word;
+        if (!line || measure(next, size, bold, italic) <= (out.length ? width : firstWidth)) line = next;
+        else { out.push(line); line = word; }
+      }
+      out.push(line);
+      // A single word wider than the box (rare) is shrunk to fit.
+      return out.map((t, i) => {
+        const limit = i ? width : firstWidth;
+        const lw = measure(t, size, bold, italic);
+        return { text: t, size: lw > limit ? size * limit / lw : size };
+      });
+    }
+
+    function layoutRows(rows, withFrame) {
+      const width = BW - 2 - (withFrame ? PW + 1 : 0);
+      const lines = [];
+      for (const r of rows) {
+        const reserve = r.markers.reduce((sum, m) => sum + markerWidth(m), 0);
+        const size = r.style.bold ? FONT_NAME : FONT;
+        const parts = r.text ? wrapText(r.text, size, r.style.bold, r.style.italic, width - reserve, width) : [{ text: "", size }];
+        parts.forEach((p, i) => lines.push({ ...p, style: r.style, markers: i === 0 ? r.markers : [] }));
+      }
+      return lines;
+    }
+
+    // Birth and death share a line when they fit, otherwise one line each.
+    function lifeRows(pid, markers, withFrame) {
+      const parts = lifeParts(pid);
+      if (!parts.length) return markers.filter(Boolean).length ? [row("", {}, markers)] : [];
+      const joined = row(parts.join("  "), {}, markers);
+      if (parts.length === 1 || layoutRows([joined], withFrame).length === 1) return [joined];
+      return [row(parts[0], {}, markers), row(parts[1])];
+    }
+
+    const contentCache = new Map();
+    function contents(b) {
+      const key = b.type === "couple" ? `c|${b.fam}|${b.a}|${b.second}|${b.d === 0}`
+                                      : `${b.type}|${b.kind || ""}|${b.pid}|${b.fam || ""}|${!!b.second}`;
+      if (contentCache.has(key)) return contentCache.get(key);
+      const segments = [];
+      const seg = (pid, photo, rows) => {
+        const withFrame = framed && photo;
+        segments.push({ pid, photo: withFrame, lines: layoutRows(rows, withFrame) });
+      };
+      const occupation = (pid, withFrame) =>
+        (level === "detailed" && info(pid).occupation ? [row(info(pid).occupation, { italic: true, color: "#444" })] : []);
+      if (b.type === "couple") {
+        const f = fam.get(b.fam);
+        const fullA = firstFamily.get(b.a) === b.fam;
+        const fullB = b.b && firstFamily.get(b.b) === b.fam;
+        const markA = fullA ? num(b.a) : goto("→ p.", () => fullPage(b.a));
+        const up = b.d === 0 && idx.parentFamily(b.a) ? goto("↑ p.", () => childPage(b.a)) : null;
+        const markB = b.b ? (fullB ? num(b.b) : goto("→ p.", () => fullPage(b.b))) : null;
+        const spouseParents = b.b && idx.parentFamily(b.b) ? goto("◄ p.", () => childPage(b.b)) : null;
+        const nameA = b.second && !fullA ? `${displayName(b.a)} (${L.second})` : displayName(b.a);
+        const married = level !== "compact" && f.marriage.year ? `${f.marriage.year} ` : "";
+        const nameB = b.b ? `∞ ${married}${displayName(b.b)}` : "∞ ?";
+        if (level === "compact") {
+          seg(b.a, false, [row(`${nameA} ${fullA ? yearsText(b.a) : ""}`.trim(), { bold: true }, [markA, up])]);
+          seg(b.b, false, [row(`${nameB} ${fullB ? yearsText(b.b) : ""}`.trim(), {}, [markB, spouseParents])]);
+        } else {
+          seg(b.a, fullA, [row(nameA, { bold: true }, [markA]),
+                           ...(fullA ? lifeRows(b.a, [up], framed) : up ? [row("", {}, [up])] : []),
+                           ...(fullA ? occupation(b.a) : [])]);
+          seg(b.b, !!fullB, [row(nameB, { bold: !!b.b }, [markB]),
+                             ...(fullB ? lifeRows(b.b, [spouseParents], framed) : spouseParents ? [row("", {}, [spouseParents])] : []),
+                             ...(fullB ? occupation(b.b) : [])]);
+        }
+      } else if (b.type === "single") {
+        if (level === "compact") seg(b.pid, false, [row(`${displayName(b.pid)} ${yearsText(b.pid)}`.trim(), { bold: true }, [num(b.pid)])]);
+        else seg(b.pid, true, [row(displayName(b.pid), { bold: true }, [num(b.pid)]), ...lifeRows(b.pid, [], framed), ...occupation(b.pid)]);
+      } else {
+        const target = b.kind === "cut" ? goto("→ p.", () => famPage.get(b.fam)) : goto("→ p.", () => fullPage(b.pid));
+        const name = b.second ? `${displayName(b.pid)} (${L.second})` : displayName(b.pid);
+        const style = { italic: true, color: "#444" };
+        if (level === "compact") seg(b.pid, false, [row(`${name} ${yearsText(b.pid)}`.trim(), style, [target])]);
+        else seg(b.pid, false, [row(name, style, [num(b.pid)]), row(yearsText(b.pid), { color: "#444" }, [target])]);
+      }
+      const h = PAD + segments.reduce((sum, g) => sum + (g.photo ? Math.max(g.lines.length * LH, PH + 0.8) : g.lines.length * LH), 0);
+      const result = { segments, h };
+      contentCache.set(key, result);
+      return result;
+    }
+
     // ---- Layout of one chart (abstract boxes, heights only) ---------------------------
     const cut = new Set();                          // families that continue as their own chart
     function place(F, d, top, out, via, second, heights) {
       const f = fam.get(F);
       const a = via || f.husband || f.wife;
       const b = a === f.husband ? f.wife : a === f.wife ? f.husband : null;
-      if (out) out.push({ type: "couple", fam: F, a, b, second: !!second, d, y: top, h: H.couple });
+      const couple = { type: "couple", fam: F, a, b, second: !!second, d, y: top };
+      couple.h = contents(couple).h;
+      if (out) out.push(couple);
       let y = top;
       const anchors = [];
       if (d < COLS - 1) {
@@ -121,28 +258,30 @@
             placed.forEach((G, i) => {
               if (d + 1 === COLS - 1 && fam.get(G).children.length) cut.add(G);   // no room for its children
               if (cut.has(G)) {
-                if (out) out.push({ type: "short", kind: "cut", pid: c, fam: G, second: i > 0, d: d + 1, y, h: H.short });
+                const box = { type: "short", kind: "cut", pid: c, fam: G, second: i > 0, d: d + 1, y };
+                box.h = contents(box).h;
+                if (out) out.push(box);
                 anchors.push(y);
-                y += H.short + GAP;
+                y += box.h + GAP;
               } else {
                 const h = place(G, d + 1, y, out, c, i > 0, heights);
                 anchors.push(y);
                 y += h + GAP;
               }
             });
-          } else if (!firstFamily.has(c)) {
-            if (out) out.push({ type: "single", pid: c, d: d + 1, y, h: H.single });
-            anchors.push(y);
-            y += H.single + GAP;
           } else {
-            if (out) out.push({ type: "short", kind: "elsewhere", pid: c, fam: firstFamily.get(c), d: d + 1, y, h: H.short });
+            const box = !firstFamily.has(c)
+              ? { type: "single", pid: c, d: d + 1, y }
+              : { type: "short", kind: "elsewhere", pid: c, fam: firstFamily.get(c), d: d + 1, y };
+            box.h = contents(box).h;
+            if (out) out.push(box);
             anchors.push(y);
-            y += H.short + GAP;
+            y += box.h + GAP;
           }
         }
       }
       if (out && anchors.length) out.push({ type: "bracket", d, from: top, anchors });
-      const h = Math.max(H.couple, anchors.length ? y - GAP - top : 0);
+      const h = Math.max(couple.h, anchors.length ? y - GAP - top : 0);
       if (heights) heights.set(F, h);
       return h;
     }
@@ -224,94 +363,25 @@
       const m = appearances.get(pid);
       m.set(page, m.get(page) || full);
     };
-    const info = (pid) => idx.info(pid);
-    const no = (pid) => (number.has(pid) ? `[${number.get(pid)}]` : "");
     let drawingPage = 0;                            // references to the page being drawn are left out
     const ref = (sign, page) => (page && page !== drawingPage ? `${sign} ${f2(page)}` : "");
-    const life = (pid) => {
-      const p = info(pid);
-      if (level === "compact") return p.years ? `(${p.years})` : "";
-      const part = (sign, e) => (e.year || e.place ? `${sign} ${[e.year, shortPlace(e.place)].filter(Boolean).join(" ")}` : "");
-      return [part("*", p.birth), part("†", p.death)].filter(Boolean).join("  ");
-    };
-    const displayName = (pid) => {
-      const p = info(pid);
-      return level !== "compact" && p.nick ? `${p.name} '${p.nick}'` : p.name;
-    };
-
-    function textLine(x, y, left, right, opts = {}) {
-      const size = opts.size || FONT;
-      const max = (opts.chars || CHARS) - (right ? right.length + 1 : 0);
-      let s = `<text x="${f2(x + 1 + (opts.indent || 0))}" y="${f2(y)}" font-size="${opts.bold ? FONT_NAME : size}"` +
-        `${opts.bold ? ' font-weight="bold"' : ""}${opts.italic ? ' font-style="italic"' : ""} fill="${opts.color || "#111"}">` +
-        `${esc(fit(left, opts.bold ? max - 4 : max))}</text>`;
-      if (right) {
-        s += `<text x="${f2(x + BW - 1)}" y="${f2(y)}" font-size="${FONT_SMALL}" text-anchor="end" fill="#666">${esc(right)}</text>`;
-      }
-      return s;
-    }
+    const markerText = (m) => (m.type === "num" ? (number.has(m.pid) ? `[${number.get(m.pid)}]` : "")
+                                                 : ref(m.sign, m.to()));
 
     function drawBox(b, x, y0, page) {
       const y = y0 + b.y;
-      let rows = [];        // [left, right, opts] of the current person
-      const segments = [];  // one per person: { pid, rows, photo }
-      const person = (pid, photo) => { rows = []; segments.push({ pid, rows, photo }); };
-      let style = 'fill="#ffffff" stroke="#555" stroke-width="0.25"';
       if (b.type === "couple") {
-        const fullA = firstFamily.get(b.a) === b.fam;
-        const fullB = b.b && firstFamily.get(b.b) === b.fam;
-        const f = fam.get(b.fam);
-        appear(b.a, page, fullA);
-        appear(b.b, page, fullB);
-        const up = b.d === 0 && idx.parentFamily(b.a) ? ref("↑ p.", childPage(b.a)) : "";
-        const nameA = b.second && !fullA ? `${displayName(b.a)} (${L.second})` : displayName(b.a);
-        const rightA = fullA ? no(b.a) : ref("→ p.", fullPage(b.a));
-        const spouseParents = b.b && idx.parentFamily(b.b) ? ref("◄ p.", childPage(b.b)) : "";
-        const married = f.marriage.year ? `${f.marriage.year} ` : "";
-        const nameB = b.b ? `∞ ${level === "compact" ? "" : married}${displayName(b.b)}` : "∞ ?";
-        const rightB = b.b ? (fullB ? no(b.b) : ref("→ p.", fullPage(b.b))) : "";
-        if (level === "compact") {
-          person(b.a, false);
-          rows.push([`${nameA} ${fullA ? life(b.a) : ""} ${up}`.trim(), rightA, { bold: true }]);
-          person(b.b, false);
-          rows.push([`${nameB} ${b.b && fullB ? life(b.b) : ""} ${spouseParents}`.trim(), rightB, {}]);
-        } else {
-          person(b.a, fullA);
-          rows.push([nameA, rightA, { bold: true }]);
-          rows.push([fullA ? life(b.a) : "", up, {}]);
-          if (level === "detailed") rows.push([fullA ? info(b.a).occupation : "", "", { italic: true, color: "#444" }]);
-          person(b.b, !!(b.b && fullB));
-          rows.push([nameB, rightB, { bold: !!b.b }]);
-          rows.push([b.b && fullB ? life(b.b) : "", spouseParents, {}]);
-          if (level === "detailed") rows.push([b.b && fullB ? info(b.b).occupation : "", "", { italic: true, color: "#444" }]);
-        }
-      } else if (b.type === "single") {
-        appear(b.pid, page, true);
-        person(b.pid, true);
-        if (level === "compact") rows.push([`${displayName(b.pid)} ${life(b.pid)}`.trim(), no(b.pid), { bold: true }]);
-        else {
-          rows.push([displayName(b.pid), no(b.pid), { bold: true }]);
-          rows.push([life(b.pid), "", {}]);
-          if (level === "detailed") rows.push([info(b.pid).occupation, "", { italic: true, color: "#444" }]);
-        }
+        appear(b.a, page, firstFamily.get(b.a) === b.fam);
+        appear(b.b, page, !!(b.b && firstFamily.get(b.b) === b.fam));
       } else {
-        appear(b.pid, page, false);
-        person(b.pid, false);
-        style = 'fill="#f6f6f6" stroke="#999" stroke-width="0.2" stroke-dasharray="0.8 0.5"';
-        const target = b.kind === "cut" ? famPage.get(b.fam) : fullPage(b.pid);
-        const name = b.second ? `${displayName(b.pid)} (${L.second})` : displayName(b.pid);
-        const years = info(b.pid).years ? `(${info(b.pid).years})` : "";
-        if (level === "compact") rows.push([`${name} ${years}`.trim(), ref("→ p.", target), { italic: true, color: "#444" }]);
-        else {
-          rows.push([name, no(b.pid), { italic: true, color: "#444" }]);
-          rows.push([years, ref("→ p.", target), { color: "#444" }]);
-        }
+        appear(b.pid, page, b.type === "single");
       }
+      const style = b.type === "short" ? 'fill="#f6f6f6" stroke="#999" stroke-width="0.2" stroke-dasharray="0.8 0.5"'
+                                       : 'fill="#ffffff" stroke="#555" stroke-width="0.25"';
       let s = `<rect x="${f2(x)}" y="${f2(y)}" width="${BW}" height="${f2(b.h)}" ${style}/>`;
       let top = y + PAD / 2;
-      for (const seg of segments) {
-        const withFrame = framed && b.type !== "short";
-        if (withFrame && seg.photo) {
+      for (const seg of contents(b).segments) {
+        if (seg.photo) {
           // A portrait frame: the photo if there is one, otherwise empty space for it.
           const fx = x + 1, fy = top + 0.3;
           const url = photoFor(seg.pid);
@@ -321,11 +391,19 @@
                  `<rect x="${f2(fx)}" y="${f2(fy)}" width="${PW}" height="${PH}" fill="none" stroke="#777" stroke-width="0.2"/>`;
           }
         }
-        const opts = withFrame ? { indent: PW + 1, chars: CHARS_PHOTO } : {};
-        seg.rows.forEach(([left, right, o], i) => {
-          s += textLine(x, top + LH * (i + 0.78), left, right, { ...o, ...opts });
+        const left = x + 1 + (seg.photo ? PW + 1 : 0);
+        seg.lines.forEach((ln, i) => {
+          const by = top + LH * (i + 0.78);
+          if (ln.text) {
+            s += `<text x="${f2(left)}" y="${f2(by)}" font-size="${f2(ln.size)}"${ln.style.bold ? ' font-weight="bold"' : ""}` +
+                 `${ln.style.italic ? ' font-style="italic"' : ""} fill="${ln.style.color || "#111"}">${esc(ln.text)}</text>`;
+          }
+          const right = ln.markers.map(markerText).filter(Boolean).join(" ");
+          if (right) {
+            s += `<text x="${f2(x + BW - 1)}" y="${f2(by)}" font-size="${FONT_SMALL}" text-anchor="end" fill="#666">${esc(right)}</text>`;
+          }
         });
-        top += b.type === "short" ? seg.rows.length * LH : segH(seg.rows.length);
+        top += seg.photo ? Math.max(seg.lines.length * LH, PH + 0.8) : seg.lines.length * LH;
       }
       return s;
     }
