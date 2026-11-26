@@ -358,7 +358,8 @@ async function startPython() {
   const pyodide = await loadPyodide();
   pyodide.FS.mkdirTree("/app/gedcom_tools");
   for (const name of MODULES) {
-    const response = await fetch(SRC + name + ".py");
+    // "no-cache": always check with the server, so a new page never runs an old cached converter.
+    const response = await fetch(SRC + name + ".py", { cache: "no-cache" });
     if (!response.ok) throw new Error(`could not load ${name}.py (HTTP ${response.status})`);
     pyodide.FS.writeFile(`/app/gedcom_tools/${name}.py`, await response.text());
   }
