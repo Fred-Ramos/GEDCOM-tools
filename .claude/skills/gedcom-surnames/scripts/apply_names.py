@@ -1,6 +1,7 @@
 """
 Write the cleaned names (rules section 2) and the user's answers (names_*.json) into a NEW tree:
-<tree stem>_surnames.json and <tree stem>_surnames.ged. The input tree is never modified.
+<tree stem>_surnames.zip (the .ged + the photos it links to) and <tree stem>_surnames.json.
+The input tree is never modified.
 
 For every changed person the birth NAME comes first (with GIVN, SURN, NICK, TYPE birth), then any
 married names (TYPE married), alternative surnames and the original name (TYPE aka).
@@ -15,7 +16,7 @@ import json
 import os
 
 from names_lib import Tree, clean, load_answers, load_config, squash
-from gedcom_tools.converter import json_to_gedcom
+from gedcom_tools.converter import collect_photos, write_outputs
 
 
 def name_record(given, surname, kind, nick=None):
@@ -99,12 +100,8 @@ def main():
     if args.dry_run:
         print("Dry run: nothing written.")
         return
-    out_stem = stem + "_surnames"
-    with open(out_stem + ".json", "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    with open(out_stem + ".ged", "w", encoding="utf-8") as f:
-        f.write(json_to_gedcom(out))
-    print(f"Written: {out_stem}.json and {out_stem}.ged (input unchanged)")
+    # Output: <stem>_surnames.zip (the .ged + the photos it links to) and <stem>_surnames.json.
+    print(write_outputs(stem + "_surnames", out, collect_photos(args.tree, out)) + " (input unchanged)")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 ---
 name: gedcom-notes
-description: Interpret the free-text NOTE of each individual in a GEDCOM JSON (made from a Quick Family Tree .ftz) and turn it into real GEDCOM records - BIRT, BAPM, DEAT (with CAUS), BURI, RESI, OCCU on individuals and MARR on families - then write the processed .json and .ged. Use when the user wants to extract, interpret or structure family-tree notes, add marriages from notes, or enrich a .ged/.json/.ftz tree.
+description: Interpret the free-text NOTE of each individual in a GEDCOM JSON (made from a Quick Family Tree .ftz) and turn it into real GEDCOM records - BIRT, BAPM, DEAT (with CAUS), BURI, RESI, OCCU on individuals and MARR on families - then write the processed .json and .zip (.ged + photos). Use when the user wants to extract, interpret or structure family-tree notes, add marriages from notes, or enrich a .ged/.json/.ftz tree.
 ---
 
 # GEDCOM notes → GEDCOM records
@@ -13,7 +13,7 @@ Rules for interpreting notes: [rules.md](rules.md). Read it fully before writing
 All commands run from the repository root. `SK=.claude/skills/gedcom-notes/scripts`.
 
 ## 1. Get the JSON tree
-If the user gave a `.ftz`, convert it first (writes `NAME.json` and `NAME.ged`):
+If the user gave a `.ftz`, convert it first (writes `NAME.json` and `NAME.zip` = `NAME.ged` + photos):
 
 ```bash
 PYTHONPATH=src python3 -c "from gedcom_tools.converter import process_ftz; process_ftz('NAME.ftz', 'NAME')"
@@ -45,7 +45,7 @@ run again.
 ## 4. Apply
 
 ```bash
-python3 $SK/apply_patches.py NAME.json NAME_notes   # → NAME_processed.json + NAME_processed.ged
+python3 $SK/apply_patches.py NAME.json NAME_notes   # → NAME_processed.json + NAME_processed.zip (.ged + photos)
 ```
 
 The original `NAME.json` is never modified.
@@ -56,5 +56,5 @@ The original `NAME.json` is never modified.
 - A few before/after examples, including at least one marriage.
 - Notes you deliberately left untouched because they were ambiguous.
 
-These files contain personal family data. Keep them local: `*.json` and `*.ged` are
+These files contain personal family data. Keep them local: `*.json`, `*.ged` and `*.zip` are
 gitignored, so never force-add them or send them anywhere.

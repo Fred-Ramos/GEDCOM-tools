@@ -25,7 +25,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO_ROOT / "src"))
-from gedcom_tools.converter import json_to_gedcom  # noqa: E402
+from gedcom_tools.converter import collect_photos, write_outputs  # noqa: E402
 
 INDI_EVENTS = {"BIRT", "BAPM", "DEAT", "BURI", "RESI"}
 FAM_EVENTS = {"MARR"}
@@ -207,9 +207,8 @@ def main():
         print("\nDry run: nothing written.")
         return
     stem = args.out or str(tree_path.with_name(tree_path.stem + "_processed"))
-    Path(stem + ".json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    Path(stem + ".ged").write_text(json_to_gedcom(data), encoding="utf-8")
-    print(f"\nWritten: {stem}.json and {stem}.ged")
+    # Output: <stem>.zip (the .ged + the photos it links to) and <stem>.json.
+    print("\n" + write_outputs(stem, data, collect_photos(str(tree_path), data)))
 
 
 if __name__ == "__main__":

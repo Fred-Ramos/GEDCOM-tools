@@ -208,9 +208,8 @@
           <dt>Photos</dt><dd id="s-faces">&ndash;</dd>
         </dl>
         <div class="row">
-          <button id="save-ged" disabled>Save .ged</button>
+          <button id="save-zip" disabled title="The .ged and the photos folder it links to">Save .zip (.ged + photos)</button>
           <button id="save-json" disabled>Save .json</button>
-          <button id="save-zip" disabled title=".ged + .json + the photos folder the .ged links to">Save .zip (with photos)</button>
         </div>
       </fieldset>
 
@@ -226,9 +225,9 @@
     <section role="tabpanel" id="panel-tree" aria-labelledby="tab-tree" hidden>
       <div class="toolbar">
         <span>Tree file:</span>
-        <button id="tree-open" disabled>Open .ged&hellip;</button>
+        <button id="tree-open" disabled>Open .zip / .ged&hellip;</button>
         <div class="field" id="tree-file">None yet</div>
-        <input type="file" id="tree-file-input" accept=".ged,.json" class="visually-hidden" tabindex="-1" aria-hidden="true">
+        <input type="file" id="tree-file-input" accept=".zip,.ged,.json" class="visually-hidden" tabindex="-1" aria-hidden="true">
       </div>
       <div class="toolbar">
         <label for="tree-style">Style:</label>
@@ -262,7 +261,7 @@
         <span class="legend" data-style="1">Leaves:<i style="background:#a3ab4c"></i>mother's side<i style="background:#4e8e56"></i>father's side</span>
       </div>
       <div class="toolbar selection" id="tree-selection" hidden></div>
-      <p class="tree-empty" id="tree-empty">Convert a file in <a href="#convert">Convert</a>, or open a .ged file above.</p>
+      <p class="tree-empty" id="tree-empty">Convert a file in <a href="#convert">Convert</a>, or open a .zip or .ged file above.</p>
       <div class="tree-viewport" id="tree-viewport" hidden>
         <div class="tree-sizer" id="tree-sizer"><div class="tree-stage" id="tree-stage"></div></div>
       </div>
@@ -317,7 +316,7 @@ import sys, json, zipfile
 from io import BytesIO
 sys.path.insert(0, "/app")
 from gedcom_tools import __version__
-from gedcom_tools.converter import ftz_to_json, json_to_gedcom, inspect_ftz, gedcom_to_json, ftz_photos
+from gedcom_tools.converter import ftz_to_json, json_to_gedcom, inspect_ftz, gedcom_to_json, ftz_photos, make_zip, read_zip
 import base64
 LAST = {}
 
@@ -336,14 +335,14 @@ def web_convert(js_bytes, stem):
                       ensure_ascii=False)
 
 def web_zip():
-    """The last conversion as a .zip: the .ged, the .json and the photos folder the .ged links to."""
-    out = BytesIO()
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(f"{LAST['stem']}.ged", LAST["gedcom"])
-        z.writestr(f"{LAST['stem']}.json", json.dumps(LAST["tree"], ensure_ascii=False, indent=2))
-        for path, image in LAST["photos"].items():
-            z.writestr(path, image)
-    return out.getvalue()
+    """The last conversion as a .zip: the .ged and the photos folder it links to (the .json stays outside)."""
+    return make_zip(f"{LAST['stem']}.ged", LAST["gedcom"], LAST["photos"])
+
+def web_read_zip(js_bytes):
+    name, tree, photos = read_zip(js_bytes.to_bytes())
+    return json.dumps({"name": name, "tree": tree,
+                       "photos": {path: base64.b64encode(image).decode() for path, image in photos.items()}},
+                      ensure_ascii=False)
 
 def web_read_ged(js_bytes):
     raw = js_bytes.to_bytes()
@@ -367,11 +366,13 @@ async function startPython() {
   const webConvert = pyodide.globals.get("web_convert");
   const webReadGed = pyodide.globals.get("web_read_ged");
   const webZip = pyodide.globals.get("web_zip");
+  const webReadZip = pyodide.globals.get("web_read_zip");
   return {
     version: pyodide.globals.get("__version__"),
     convert: (bytes, stem) => JSON.parse(webConvert(bytes, stem)),
     zip: () => { const proxy = webZip(); const bytes = proxy.toJs(); proxy.destroy(); return bytes; },
     readGed: (bytes) => JSON.parse(webReadGed(bytes)),
+    readZip: (bytes) => JSON.parse(webReadZip(bytes)),
   };
 }
 
@@ -457,7 +458,6 @@ function showResult({ name, faces, tree, gedcom }) {
   $("s-families").textContent = (tree.FAM || []).length;
   $("s-notes").textContent = people.filter((p) => p.NOTE).length;
   $("s-faces").textContent = faces;
-  $("save-ged").disabled = false;
   $("save-json").disabled = false;
   $("save-zip").disabled = false;
 
@@ -477,8 +477,6 @@ $("file").addEventListener("change", () => {
 });
 $("save-zip").addEventListener("click", () =>
   save(state.python.zip(), state.stem + ".zip", "application/zip"));
-$("save-ged").addEventListener("click", () =>
-  save(state.result.gedcom, state.stem + ".ged", "text/plain;charset=utf-8"));
 $("save-json").addEventListener("click", () =>
   save(JSON.stringify(state.result.tree, null, 2), state.stem + ".json", "application/json"));
 
@@ -491,7 +489,7 @@ win.addEventListener("drop", (event) => {
   win.classList.remove("dragging");
   const file = event.dataTransfer.files[0];
   if (!file) return;
-  if (/\.(ged|json)$/i.test(file.name)) {
+  if (/\.(ged|json|zip)$/i.test(file.name)) {
     selectTab("tree"); history.replaceState(null, "", "#tree"); loadTreeFile(file);
   } else {
     selectTab("convert"); history.replaceState(null, "", "#convert"); convertFile(file);
@@ -514,9 +512,15 @@ async function loadTreeFile(file) {
   setStatus(`Reading ${file.name}…`);
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const tree = /\.json$/i.test(file.name)
-      ? JSON.parse(new TextDecoder().decode(bytes))
-      : state.python.readGed(bytes);
+    let tree;
+    if (/\.zip$/i.test(file.name)) {
+      // A tree .zip: the .ged and the photos it links to.
+      const opened = state.python.readZip(bytes);
+      tree = opened.tree;
+      for (const [path, b64] of Object.entries(opened.photos)) addPhoto(path, "data:image/jpeg;base64," + b64);
+    } else {
+      tree = /\.json$/i.test(file.name) ? JSON.parse(new TextDecoder().decode(bytes)) : state.python.readGed(bytes);
+    }
     if (!tree || !Array.isArray(tree.INDI) || !tree.INDI.length) throw new Error("no people found in this file");
     treeView.load(tree);
     $("tree-file").textContent = file.name;

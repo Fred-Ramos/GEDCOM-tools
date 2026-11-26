@@ -4,7 +4,8 @@ This repository converts .ftz family tree archives (used in the android app **Qu
 
 ## Usage in the browser
 
-Open the web page (`web/index.html`), choose an `.ftz` file and the `.ged` downloads.
+Open the web page (`web/index.html`), choose an `.ftz` file, then save the `.zip` (the `.ged` with its
+photos) and, if you want it, the `.json`.
 The conversion runs in your browser with [Pyodide](https://pyodide.org); the file is never uploaded.
 
 To run the page locally, serve the repository root (opening the file directly does not work):
@@ -47,10 +48,14 @@ gedcom-tools                     # same as python3 main.py
 
 ## Result
 
-Either using source code with python or the executable, each `.ftz` file will be converted into a `.ged` file with the same
-name:
+Either using source code with python or the executable, each `.ftz` file is converted into two files
+with the same name:
 
-    example.ftz  ->  example.ged
+    example.ftz  ->  example.zip    (example.ged + the example_photos/ folder it links to)
+                     example.json   (the same tree as JSON, outside the zip, easy to read)
+
+Unzip `example.zip` to use the `.ged` in another genealogy program; keep the photos folder next to it.
+The web page opens the `.zip` directly (Family tree and Book tabs), photos included.
 
 ## Turning notes into GEDCOM records (Claude Code)
 
@@ -58,13 +63,12 @@ The app stores births, baptisms, deaths, burials, occupations and marriages as f
 in each person's note. With [Claude Code](https://claude.com/claude-code) open in this
 repository, ask it to interpret the notes of a tree (or run `/gedcom-notes`):
 
-    example.ftz  ->  example_processed.ged   (notes turned into BIRT, BAPM, DEAT, BURI, RESI, OCCU, MARR)
+    example.json  ->  example_processed.zip + example_processed.json   (notes turned into BIRT, BAPM, DEAT, BURI, RESI, OCCU, MARR)
 
 The skill lives in `.claude/skills/gedcom-notes/`. The interpretation rules are in `rules.md`.
 Existing data is never overwritten; disagreements are reported.
 
 ## Notes
 
--   Photos inside the `.ftz` are saved to an `example_photos/` folder next to the `.ged`, which links
-    each person to their photo (GEDCOM `OBJE`/`FILE`). Keep the folder next to the `.ged`. In the web
-    page, **Save .zip** downloads the `.ged`, the `.json` and the photos together.
+-   A `.ged` file cannot contain images, only links to them. Each person with a photo in the `.ftz` gets
+    a link (GEDCOM `OBJE`/`FILE`) to `example_photos/<id>.jpg`, and that folder is inside the `.zip`.

@@ -33,7 +33,8 @@ All commands run from the repository root. `SK=.claude/skills/gedcom-surnames/sc
    Write only the answers given. **Certain** cleaning changes need only a summary.
 6. **Apply.** `python3 $SK/apply_names.py X.json` writes the birth `NAME` first, then `married`/`aka` names and
    `NICK`, and saves the result to **new files** named after the input: `X.json` →
-   `X_surnames.json` + `X_surnames.ged` (e.g. `FamilyTree_processed_surnames.json`).
+   `X_surnames.json` + `X_surnames.zip` (the `.ged` + the photos it links to), e.g.
+   `FamilyTree_processed_surnames.json` + `.zip`.
    Every worked-out surname also adds `Apelido deduzido (não registado): … Base: ….` to the
    person's NOTE (rules section 5), so guessed surnames are always marked.
    The input tree is never modified. Original names are also kept as `aka`, so every change
@@ -42,5 +43,5 @@ All commands run from the repository root. `SK=.claude/skills/gedcom-surnames/sc
 7. **Report** counts per rule, every guess the user accepted, and the people still without a
    surname (and why).
 
-These files contain personal family data. Keep them local (`*.json`, `*.ged` are gitignored).
+These files contain personal family data. Keep them local (`*.json`, `*.ged`, `*.zip` are gitignored).
 Examples in this skill use invented names; keep it that way, because the repository is public.

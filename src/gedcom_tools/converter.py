@@ -528,7 +528,91 @@ def ftz_to_gedcom(data: bytes, lang: str = "English", photo_dir: str = None) -> 
     return json_to_gedcom(ftz_to_json(data, lang, photo_dir))
 
 # ---------------------------
-# Main convert flow (CLI: reads the .ftz and writes .json + .ged)
+# Output package: <name>.zip (the .ged + the photos it links to), <name>.json outside
+# ---------------------------
+def photo_links(tree: dict) -> List[str]:
+    """The photo paths a GEDCOM JSON links to (INDI → OBJE → FILE)."""
+    links = []
+    for person in tree.get(T.INDIVIDUAL, []):
+        objs = person.get(T.OBJECT)
+        for obj in objs if isinstance(objs, list) else [objs] if objs else []:
+            files = obj.get(T.FILE) if isinstance(obj, dict) else None
+            for f in files if isinstance(files, list) else [files] if files else []:
+                path = f.get(T._NAME) if isinstance(f, dict) else f
+                if path and path not in links:
+                    links.append(path)
+    return links
+
+def make_zip(ged_name: str, gedcom_text: str, photos: Dict[str, bytes]) -> bytes:
+    """A .zip with the .ged and the photos, at the paths the .ged links to."""
+    out = BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(ged_name, gedcom_text)
+        for path, image in photos.items():
+            z.writestr(path, image)
+    return out.getvalue()
+
+def read_zip(data: bytes) -> Tuple[str, dict, Dict[str, bytes]]:
+    """Open a tree .zip: (name of the .ged or .json inside, GEDCOM JSON, {photo path: bytes})."""
+    try:
+        archive = zipfile.ZipFile(BytesIO(bytes(data)))
+    except zipfile.BadZipFile:
+        raise ValueError("Not a valid .zip file.")
+    with archive:
+        names = archive.namelist()
+        tree_name = next((n for n in names if n.lower().endswith(".ged")), None) or \
+                    next((n for n in names if n.lower().endswith(".json")), None)
+        if not tree_name:
+            raise ValueError("No .ged or .json file inside the .zip.")
+        raw = archive.read(tree_name)
+        if tree_name.lower().endswith(".json"):
+            tree = json.loads(raw.decode("utf-8-sig"))
+        else:
+            try:
+                text = raw.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = raw.decode("latin-1")
+            tree = gedcom_to_json(text)
+        photos = {n: archive.read(n) for n in names
+                  if os.path.splitext(n)[1].lower() in (".jpg", ".jpeg", ".png", ".gif", ".webp")}
+    return tree_name, tree, photos
+
+def collect_photos(near: str, tree: dict) -> Dict[str, bytes]:
+    """
+    Find the photos a tree links to, for a tree file at path `near`: first as files next to it
+    (e.g. a <name>_photos/ folder), then inside <name>.zip, then inside any other .zip in that folder.
+    """
+    folder = os.path.dirname(os.path.abspath(near))
+    stem = os.path.splitext(os.path.abspath(near))[0]
+    zips = [stem + ".zip"] + sorted(os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(".zip"))
+    found = {}
+    for link in photo_links(tree):
+        path = os.path.join(folder, link)
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                found[link] = f.read()
+            continue
+        for z in dict.fromkeys(zips):
+            if os.path.isfile(z):
+                with zipfile.ZipFile(z) as archive:
+                    if link in archive.namelist():
+                        found[link] = archive.read(link)
+                        break
+    return found
+
+def write_outputs(out_stem: str, tree: dict, photos: Dict[str, bytes]) -> str:
+    """Write <out_stem>.json and <out_stem>.zip (<name>.ged + photos). Returns a one-line summary."""
+    with open(out_stem + ".json", "w", encoding="utf-8") as f:
+        json.dump(tree, f, ensure_ascii=False, indent=2)
+    name = os.path.basename(out_stem)
+    with open(out_stem + ".zip", "wb") as f:
+        f.write(make_zip(name + ".ged", json_to_gedcom(tree), photos))
+    missing = [link for link in photo_links(tree) if link not in photos]
+    return (f"Written: {out_stem}.zip ({name}.ged + {len(photos)} photos) and {out_stem}.json"
+            + (f"; {len(missing)} linked photos not found" if missing else ""))
+
+# ---------------------------
+# Main convert flow (CLI: reads the .ftz and writes <name>.zip + <name>.json)
 # ---------------------------
 def convert(file: str, output_name: str):
     if not file.lower().endswith(".ftz"):
@@ -544,35 +628,15 @@ def convert(file: str, output_name: str):
             folder_name, faces = inspect_ftz(archive)
         print(f"Found Family Tree: {folder_name}")
         photos = ftz_photos(data)
-        # Photos go to a folder next to the .ged, which links to them with relative paths.
+        # The .ged links to the photos in a <name>_photos/ folder inside the .zip.
         photo_dir = os.path.basename(output_name) + "_photos"
         gedcom_json = ftz_to_json(data, photo_dir=photo_dir if photos else None)
     except (ValueError, zipfile.BadZipFile) as e:
         print(f"⚠️ {e}")
         return None
 
-    if photos:
-        folder = output_name + "_photos"
-        os.makedirs(folder, exist_ok=True)
-        linked = {int(os.path.splitext(os.path.basename(
-            (p.get(T.OBJECT) or {}).get(T.FILE, {}).get(T._NAME, "x")))[0] or 0)
-            for p in gedcom_json[T.INDIVIDUAL] if T.OBJECT in p}
-        for pid, image in photos.items():
-            with open(os.path.join(folder, f"{pid}.jpg"), "wb") as f:
-                f.write(image)
-        print(f"Photos: {len(photos)} saved to {folder}/ ({len(linked)} linked to people)")
-    else:
-        print("No photos in this file.")
-
-    json_name = output_name + ".json"
-    with open(json_name, "w", encoding="utf-8") as f:
-        json.dump(gedcom_json, f, indent=2)
-    print(f"JSON written to: {json_name}")
-
-    gedcom_name = output_name + ".ged"
-    with open(gedcom_name, "w", encoding="utf-8") as f:
-        f.write(json_to_gedcom(gedcom_json))
-    print(f"GEDCOM written to: {gedcom_name}")
+    files = {f"{photo_dir}/{pid}.jpg": image for pid, image in photos.items()}
+    print(write_outputs(output_name, gedcom_json, files))
 
 def process_ftz(file: str, output_name: str):
     convert(file, output_name)

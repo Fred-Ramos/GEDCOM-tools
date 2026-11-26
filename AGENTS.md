@@ -12,8 +12,8 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   Retro 90s desktop style on purpose: square corners, bevelled grey, no rounded edges; the window fills
   the screen. A third tab, Book, builds the family book (web/book.js).
 - `web/tree.js` - the Family tree tab (plain JS, also loadable in Node for tests). It reads the tree
-  converted in the Convert tab by default, or a `.ged`/`.json` opened in the tab (`.ged` goes through
-  `gedcom_to_json` in Pyodide). Values may be strings, objects or lists depending on the program that
+  converted in the Convert tab by default, or a `.zip`/`.ged`/`.json` opened in the tab (`.ged` goes through
+  `gedcom_to_json` in Pyodide; a `.zip` through `read_zip`, which also brings its photos). Values may be strings, objects or lists depending on the program that
   wrote the file, so read them through its `first`/`pointer`/`ref` helpers. Rule: search one person;
   show them and all ancestors; each ancestor (and the chosen person) has checkboxes Siblings (full siblings
   only) → Their children (of all those siblings) → Grandchildren; never more than 2 generations below a
@@ -57,7 +57,9 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
 whole thing with no file I/O; `convert()` is the CLI wrapper that reads/writes files.
 Photos: the app stores them as `face/<person id>.jpg` in the `.ftz`. `ftz_photos(data)` returns them;
 with `photo_dir`, `ftz_to_json` links each person to `<photo_dir>/<id>.jpg` (`OBJE` → `FILE` → `FORM jpg`).
-The CLI saves them to `<name>_photos/` next to the `.ged` (gitignored); the web page offers a .zip.
+Output format everywhere (CLI, web, both skills): `<name>.zip` = `<name>.ged` + the `<name>_photos/` folder
+it links to, and `<name>.json` outside the zip (`write_outputs`, `make_zip`, `read_zip`, `collect_photos`).
+Skills find a tree's photos next to its .json, inside `<name>.zip`, or inside another .zip in the folder.
 `gedcom_to_json(text)` is the reverse of `json_to_gedcom`: it reads any GEDCOM (ours or another
 program's) into the same JSON shape, joining CONT/CONC. A tag that repeats becomes a list; INDI, FAM,
 FAMC, FAMS and CHIL are always lists.
@@ -74,4 +76,5 @@ To turn the free-text notes into BIRT/BAPM/DEAT/BURI/RESI/OCCU/MARR, use the
 follow `SKILL.md` and `rules.md` in that folder directly.
 
 ## Privacy
-`.ftz`, `.json` and `.ged` files are real family data and are gitignored. Never commit them.
+`.ftz`, `.json`, `.ged`, `.zip` files and `*_photos/` folders are real family data and are gitignored.
+Never commit them.
