@@ -24,7 +24,7 @@
       title: "Livro de Família", contents: "Índice geral", index: "Índice onomástico", family: "Família",
       familyOf: "Família de",
       otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
-      people: "pessoas", families: "famílias",
+      people: "pessoas", families: "casais",
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
         "→ p. página onde está a entrada completa ou a continuação da família.",
@@ -36,7 +36,7 @@
       familyOf: "Family of",
       otherFamilies: "Other families", separated: "sep.",
       marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
-      people: "people", families: "families",
+      people: "people", families: "couples",
       made: "Made on", noSurname: "no surname", how: "How to read", howText: [
         "Every person has one full entry, with their number in square brackets [no.].",
         "→ p. page with the full entry, or where the family continues.",
