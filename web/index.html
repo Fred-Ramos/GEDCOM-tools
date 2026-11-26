@@ -467,7 +467,7 @@ startPython().then((python) => {
   $("tree-open").disabled = false;
   $("python").textContent = "Python: ready";
   $("version").textContent = "v" + python.version;
-  setStatus("Ready. Open an .ftz file.");
+  setStatus("Ready.");
 }).catch((error) => {
   $("python").textContent = "Python: failed";
   setStatus("Could not start: " + lastLine(error) +
