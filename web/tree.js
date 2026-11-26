@@ -48,6 +48,13 @@
     return years ? years[years.length - 1] : null;
   }
 
+  function placeOf(event) {
+    const e = first(event);
+    let place = e && typeof e === "object" ? first(e.PLAC) : null;
+    if (place && typeof place === "object") place = place._NAME;
+    return place || null;
+  }
+
   function normalize(text) {
     return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\//g, " ");
   }
@@ -68,7 +75,12 @@
       const died = yearOf(p.DEAT);
       const years = born && died ? `${born}–${died}` : born ? `${born}–` : died ? `–${died}` :
                     p.DEAT ? "deceased" : "";
-      info.set(id, { id, name, years, born: born ? Number(born) : null, sex: first(p.SEX), search: normalize(name) });
+      info.set(id, {
+        id, name, years, born: born ? Number(born) : null, sex: first(p.SEX), search: normalize(name),
+        surname: String(n.SURN || (String(n._NAME || "").match(/\/([^/]*)\//) || [])[1] || "").trim(),
+        birth: { year: born, place: placeOf(p.BIRT) || placeOf(p.BAPM) },
+        death: { year: died, place: placeOf(p.DEAT) || placeOf(p.BURI) },
+      });
     }
 
     const birthOrder = (ids) => {
@@ -102,8 +114,19 @@
         return asList((people.get(id) || {}).FAMS).map((r) => families.get(ref(r))).filter(Boolean).map((f) => {
           const isHusband = pointer(f.HUSB) === id;
           const spouse = isHusband ? pointer(f.WIFE) : pointer(f.HUSB);
-          return { spouse: info.has(spouse) ? spouse : null, children: birthOrder(asList(f.CHIL).map(ref)), isHusband };
+          return { famId: f._PDEF, spouse: info.has(spouse) ? spouse : null,
+                   children: birthOrder(asList(f.CHIL).map(ref)), isHusband };
         });
+      },
+
+      // A couple: { id, wife, husband, children }.
+      family(famId) {
+        const f = families.get(famId);
+        if (!f) return null;
+        const wife = pointer(f.WIFE);
+        const husband = pointer(f.HUSB);
+        return { id: famId, wife: info.has(wife) ? wife : null, husband: info.has(husband) ? husband : null,
+                 children: birthOrder(asList(f.CHIL).map(ref)) };
       },
 
       search(query, limit = 100) {
@@ -191,45 +214,48 @@
     return all;
   }
 
+  // A person and the generations shown below them, each with their spouses (woman left, man right).
+  // card(id, row, kind, line) makes the card objects, so callers can number them.
+  function layoutDescendants(idx, id, row, below, line, card) {
+    const shape = new Shape();
+    const unions = below > 0 ? idx.unions(id) : [];
+    const self = card(id, row, "relative", line);
+    shape.main = self;
+    if (!unions.length) { shape.add(self); return shape; }
+
+    const kidShapes = [];
+    const kidsPerUnion = unions.map((u) => u.children.map((c) => {
+      const s = layoutDescendants(idx, c, row + 1, below - 1, line, card);
+      kidShapes.push(s);
+      return s.main;
+    }));
+    const kids = packRow(kidShapes);
+
+    // Woman on the left, man on the right.
+    const spouses = unions.map((u) => (u.spouse ? card(u.spouse, row, "spouse", line) : null));
+    const isHusband = unions[0].isHusband || (!unions.some((u) => u.isHusband) && idx.info(id).sex === "M");
+    const order = isHusband ? [...spouses.filter(Boolean), self] : [self, ...spouses.filter(Boolean)];
+
+    const kidsEdge = kids.rows.get(row + 1);
+    const center = kidsEdge ? (kidsEdge[0] + kidsEdge[1]) / 2 : 0;
+    const width = order.length * CARD_W + (order.length - 1) * COUPLE_GAP;
+    order.forEach((c, i) => { c.x = center - width / 2 + CARD_W / 2 + i * (CARD_W + COUPLE_GAP); });
+
+    shape.merge(kids);
+    order.forEach((c) => shape.add(c));
+    unions.forEach((u, i) => {
+      shape.families.push({ kind: "down", row, via: self, spouse: spouses[i], children: kidsPerUnion[i] });
+    });
+    return shape;
+  }
+
   // levels: Map id -> 0..3 (none, siblings, + their children, + grandchildren).
   // maxGenerations: how many generations of ancestors to show, counting the chosen person as 1.
   function layoutTree(idx, rootId, levels, maxGenerations = Infinity) {
     let serial = 0;
     const card = (id, row, kind, line) => ({ key: serial++, id, row, kind, line, x: 0 });
 
-    // A sibling (or a sibling's child) and the generations shown below them.
-    function descendants(id, row, below, line) {
-      const shape = new Shape();
-      const unions = below > 0 ? idx.unions(id) : [];
-      const self = card(id, row, "relative", line);
-      shape.main = self;
-      if (!unions.length) { shape.add(self); return shape; }
-
-      const kidShapes = [];
-      const kidsPerUnion = unions.map((u) => u.children.map((c) => {
-        const s = descendants(c, row + 1, below - 1, line);
-        kidShapes.push(s);
-        return s.main;
-      }));
-      const kids = packRow(kidShapes);
-
-      // Woman on the left, man on the right.
-      const spouses = unions.map((u) => (u.spouse ? card(u.spouse, row, "spouse", line) : null));
-      const isHusband = unions[0].isHusband || (!unions.some((u) => u.isHusband) && idx.info(id).sex === "M");
-      const order = isHusband ? [...spouses.filter(Boolean), self] : [self, ...spouses.filter(Boolean)];
-
-      const kidsEdge = kids.rows.get(row + 1);
-      const center = kidsEdge ? (kidsEdge[0] + kidsEdge[1]) / 2 : 0;
-      const width = order.length * CARD_W + (order.length - 1) * COUPLE_GAP;
-      order.forEach((c, i) => { c.x = center - width / 2 + CARD_W / 2 + i * (CARD_W + COUPLE_GAP); });
-
-      shape.merge(kids);
-      order.forEach((c) => shape.add(c));
-      unions.forEach((u, i) => {
-        shape.families.push({ kind: "down", row, via: self, spouse: spouses[i], children: kidsPerUnion[i] });
-      });
-      return shape;
-    }
+    const descendants = (id, row, below, line) => layoutDescendants(idx, id, row, below, line, card);
 
     // An ancestor (or the chosen person): their siblings and everyone above them.
     // side: "left" if they are the mother in the couple below, "right" if the father, "root" otherwise.
@@ -602,25 +628,77 @@
   // ------------------------------------------------------------------
   // View
   // ------------------------------------------------------------------
+  // Style 1: the illustrated tree around one person (this file).
+  // Style 2: the poster around a couple (poster.js, global FamilyPoster).
   const ZOOMS = [0.3, 0.4, 0.5, 0.6, 0.75, 0.9, 1, 1.25, 1.5];
   const LABELS = ["Siblings", "Their children", "Grandchildren"];
 
   function create(el, { onStatus = () => {} } = {}) {
-    const state = { idx: null, root: null, levels: new Map(), zoom: 1, layout: null, selected: null, keys: null };
+    const state = {
+      idx: null, style: "1", zoom: 1, layout: null, selected: null, keys: null,
+      root: null, levels: new Map(),               // style 1
+      couple: null, title: null,                   // style 2 (title null = automatic)
+      generations: { 1: "5", 2: "4" },             // remembered per style
+    };
+    const poster = () => global.FamilyPoster;
     const maxGenerations = () => Number(el.generations.value) || Infinity;
+    const button = (text, onClick) => {
+      const b = document.createElement("button");
+      b.textContent = text;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    const coupleName = (famId) => {
+      const f = state.idx.family(famId);
+      return [f.wife, f.husband].map((id) => (id ? state.idx.info(id).name : "?")).join(" & ");
+    };
+
+    // Style -------------------------------------------------------------
+    function showStyleControls() {
+      for (const node of document.querySelectorAll("[data-style]")) node.hidden = node.dataset.style !== state.style;
+      el.search.placeholder = state.style === "1" ? "Type a name, e.g. Miguel Ramos" : "Type either spouse's name";
+    }
+    el.style.addEventListener("change", () => {
+      state.generations[state.style] = el.generations.value;
+      state.style = el.style.value;
+      el.generations.value = state.generations[state.style];
+      showStyleControls();
+      el.matches.hidden = true;
+      if (!state.idx) return;
+      // Carry the current person over: Style 2 uses their first couple, Style 1 the selected person.
+      if (state.style === "2" && !state.couple && state.root) {
+        const u = state.idx.unions(state.root)[0];
+        if (u) state.couple = u.famId;
+      }
+      if (state.style === "1" && !state.root && state.selected) state.root = state.selected;
+      const has = state.style === "1" ? state.root : state.couple;
+      el.search.value = !has ? "" : state.style === "1" ? state.idx.info(state.root).name : coupleName(state.couple);
+      if (has) { state.keys = null; render(); centerOnFocus(); } else clearDrawing();
+    });
 
     // Search -----------------------------------------------------------
     function showMatches() {
       const hits = state.idx ? state.idx.search(el.search.value) : [];
-      el.matches.replaceChildren(...hits.map((p) => {
-        const option = document.createElement("option");
-        option.value = p.id;
-        option.textContent = p.years ? `${p.name} (${p.years})` : p.name;
-        return option;
-      }));
-      el.matches.hidden = !hits.length;
-      if (hits.length) el.matches.size = Math.min(8, Math.max(2, hits.length));
+      let options;
+      if (state.style === "1") {
+        options = hits.map((p) => [p.id, p.years ? `${p.name} (${p.years})` : p.name]);
+      } else {
+        // Every couple of every matching person.
+        const seen = new Set();
+        options = [];
+        for (const p of hits) {
+          for (const u of state.idx.unions(p.id)) {
+            if (seen.has(u.famId)) continue;
+            seen.add(u.famId);
+            options.push([u.famId, coupleName(u.famId)]);
+          }
+        }
+      }
+      el.matches.replaceChildren(...options.map(([value, text]) => Object.assign(document.createElement("option"), { value, textContent: text })));
+      el.matches.hidden = !options.length;
+      if (options.length) el.matches.size = Math.min(8, Math.max(2, options.length));
     }
+    const pick = (value) => (state.style === "1" ? choose(value) : chooseCouple(value));
 
     function choose(id) {
       if (!id || !state.idx.has(id)) return;
@@ -631,7 +709,24 @@
       el.search.value = state.idx.info(id).name;
       el.matches.hidden = true;
       render();
-      centerOn(id);
+      centerOnFocus();
+    }
+
+    function chooseCouple(famId) {
+      if (!famId || !state.idx.family(famId)) return;
+      state.couple = famId;
+      state.title = null;
+      state.selected = null;
+      el.search.value = coupleName(famId);
+      el.matches.hidden = true;
+      render();
+      centerOnFocus();
+    }
+
+    function switchTo(style, value) {
+      el.style.value = style;
+      el.style.dispatchEvent(new Event("change"));
+      pick(value);
     }
 
     el.search.addEventListener("input", showMatches);
@@ -641,17 +736,23 @@
         el.matches.focus();
         el.matches.selectedIndex = 0;
       } else if (event.key === "Enter" && el.matches.options.length) {
-        choose(el.matches.options[0].value);
+        pick(el.matches.options[0].value);
       } else if (event.key === "Escape") {
         el.matches.hidden = true;
       }
     });
-    el.matches.addEventListener("click", () => choose(el.matches.value));
+    el.matches.addEventListener("click", () => pick(el.matches.value));
     el.matches.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") choose(el.matches.value);
+      if (event.key === "Enter") pick(el.matches.value);
       if (event.key === "Escape") { el.matches.hidden = true; el.search.focus(); }
     });
-    el.generations.addEventListener("change", () => anchoredRender(state.root));
+    el.generations.addEventListener("change", () => anchoredRender(state.selected || state.root));
+    el.descendants.addEventListener("change", () => anchoredRender(state.selected));
+    let titleTimer = null;
+    el.title.addEventListener("input", () => {
+      clearTimeout(titleTimer);
+      titleTimer = setTimeout(() => { state.title = el.title.value; anchoredRender(state.selected); }, 350);
+    });
 
     // Zoom -------------------------------------------------------------
     function setZoom(zoom) {
@@ -676,7 +777,7 @@
                             : [...ZOOMS].reverse().find((z) => z < state.zoom - 1e-6);
       if (next) setZoom(next);
     };
-    // Zoom out (or in) so the whole tree fits in the window.
+    // Zoom out (or in) so the whole drawing fits in the window.
     function fitToWindow() {
       if (!state.layout) return;
       const vp = el.viewport;
@@ -720,39 +821,43 @@
       const id = state.selected;
       if (!id || !state.layout) { el.selection.hidden = true; return; }
       const p = state.idx.info(id);
-      const c = state.layout.cards.find((k) => k.id === id && (k.kind === "root" || k.kind === "ancestor"));
       const parts = [];
       const name = document.createElement("strong");
       name.textContent = p.name;
       parts.push(name);
       if (p.years) parts.push(document.createTextNode(` (${p.years})`));
+      const couples = state.idx.unions(id);
 
-      if (c) {
-        for (let level = 1; level <= 3; level++) {
-          if (level > 1 && (c.level < level - 1 || !c.counts[level - 2])) break;
-          const label = document.createElement("label");
-          const box = document.createElement("input");
-          box.type = "checkbox";
-          box.checked = c.level >= level;
-          box.disabled = !c.counts[level - 1];
-          box.addEventListener("change", () => {
-            state.levels.set(id, box.checked ? level : level - 1);
-            anchoredRender(id);
-          });
-          label.append(box, ` ${LABELS[level - 1]} (${c.counts[level - 1]})`);
-          parts.push(label);
+      if (state.style === "1") {
+        const c = state.layout.cards.find((k) => k.id === id && (k.kind === "root" || k.kind === "ancestor"));
+        if (c) {
+          for (let level = 1; level <= 3; level++) {
+            if (level > 1 && (c.level < level - 1 || !c.counts[level - 2])) break;
+            const label = document.createElement("label");
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.checked = c.level >= level;
+            box.disabled = !c.counts[level - 1];
+            box.addEventListener("change", () => {
+              state.levels.set(id, box.checked ? level : level - 1);
+              anchoredRender(id);
+            });
+            label.append(box, ` ${LABELS[level - 1]} (${c.counts[level - 1]})`);
+            parts.push(label);
+          }
+          if (c.more) parts.push(Object.assign(document.createElement("span"),
+            { className: "hint", textContent: "More ancestors above: raise Generations." }));
+        } else {
+          parts.push(Object.assign(document.createElement("span"),
+            { className: "hint", textContent: "Siblings can be shown for the chosen person and their ancestors." }));
         }
-        if (c.more) parts.push(Object.assign(document.createElement("span"),
-          { className: "hint", textContent: "More ancestors above: raise Generations." }));
+        if (id !== state.root) parts.push(button("Show this person's tree", () => choose(id)));
+        for (const u of couples) parts.push(button(`Poster: ${coupleName(u.famId)}`, () => switchTo("2", u.famId)));
       } else {
-        parts.push(Object.assign(document.createElement("span"),
-          { className: "hint", textContent: "Siblings can be shown for the chosen person and their ancestors." }));
-      }
-      if (id !== state.root) {
-        const button = document.createElement("button");
-        button.textContent = "Show this person's tree";
-        button.addEventListener("click", () => choose(id));
-        parts.push(button);
+        for (const u of couples) {
+          if (u.famId !== state.couple) parts.push(button(`Centre on ${coupleName(u.famId)}`, () => chooseCouple(u.famId)));
+        }
+        parts.push(button("Tree of this person (Style 1)", () => switchTo("1", id)));
       }
       el.selection.replaceChildren(...parts);
       el.selection.hidden = false;
@@ -760,13 +865,32 @@
 
     // Drawing ------------------------------------------------------------
     function render() {
-      if (!state.idx || !state.root) return;
-      const layout = layoutTree(state.idx, state.root, state.levels, maxGenerations());
-      state.layout = layout;
-      const { svg, keys } = drawTree(layout, state.idx, state.keys, state.selected);
-      state.keys = keys;
-      el.stage.style.width = layout.width + "px";
-      el.stage.style.height = layout.height + "px";
+      if (!state.idx) return;
+      let svg;
+      let status;
+      if (state.style === "1") {
+        if (!state.root) return;
+        const layout = layoutTree(state.idx, state.root, state.levels, maxGenerations());
+        const drawn = drawTree(layout, state.idx, state.keys, state.selected);
+        state.layout = layout;
+        state.keys = drawn.keys;
+        svg = drawn.svg;
+        status = `Showing ${layout.cards.length} people around ${state.idx.info(state.root).name}. Click a person for options.`;
+      } else {
+        if (!state.couple) return;
+        const auto = poster().defaultTitle(state.idx, state.couple);
+        if (state.title === null) el.title.value = auto;
+        const title = state.title === null ? auto : state.title;
+        const up = Math.min(Number(el.generations.value) || 6, 7);
+        const down = Number(el.descendants.value) || Infinity;
+        const layout = poster().layoutPoster(state.idx, state.couple, up, down, title);
+        state.layout = layout;
+        svg = poster().drawPoster(layout, state.idx, state.selected).svg;
+        const known = layout.boxes.filter((b) => b.id).length;
+        status = `Poster of ${coupleName(state.couple)}: ${known} people. Click a person for options.`;
+      }
+      el.stage.style.width = state.layout.width + "px";
+      el.stage.style.height = state.layout.height + "px";
       el.stage.innerHTML = svg;
       el.empty.hidden = true;
       el.viewport.hidden = false;
@@ -774,16 +898,30 @@
       el.saveSvg.disabled = false;
       applyZoom();
       showSelection();
-      onStatus(`Showing ${layout.cards.length} people around ${state.idx.info(state.root).name}. Click a person for options.`);
+      onStatus(status);
+    }
+
+    function clearDrawing() {
+      state.layout = null;
+      state.selected = null;
+      el.stage.replaceChildren();
+      el.viewport.hidden = true;
+      el.selection.hidden = true;
+      el.savePng.disabled = true;
+      el.saveSvg.disabled = true;
+      el.empty.hidden = false;
+      el.empty.textContent = state.style === "1" ? "Search for a person above to draw their tree."
+                                                 : "Search for either spouse above to make the poster of a couple.";
     }
 
     // Re-render, keeping one person where it is on screen.
     function anchoredRender(id) {
-      const find = () => [...el.stage.querySelectorAll(".person[data-anchor]")].find((g) => g.dataset.anchor === id);
-      const before = find();
+      const find = () => [...el.stage.querySelectorAll(".person")]
+        .find((g) => (state.style === "1" ? g.dataset.anchor : g.dataset.id) === id);
+      const before = id && find();
       const rect = before && before.getBoundingClientRect();
       render();
-      const after = find();
+      const after = id && find();
       if (rect && after) {
         const now = after.getBoundingClientRect();
         el.viewport.scrollLeft += now.left - rect.left;
@@ -791,15 +929,26 @@
       }
     }
 
-    function centerOn(id) {
-      const c = state.layout && state.layout.cards.find((k) => k.id === id);
-      if (!c) return;
-      el.viewport.scrollLeft = c.x * state.zoom - el.viewport.clientWidth / 2;
-      el.viewport.scrollTop = c.cy * state.zoom - el.viewport.clientHeight / 2;
+    // Scroll to the chosen person (Style 1) or the couple (Style 2).
+    function centerOnFocus() {
+      if (!state.layout) return;
+      let x, y;
+      if (state.style === "1") {
+        const c = state.layout.cards.find((k) => k.id === state.root);
+        if (!c) return;
+        [x, y] = [c.x, c.cy];
+      } else {
+        [x, y] = [state.layout.couple.x, state.layout.couple.y];
+      }
+      el.viewport.scrollLeft = x * state.zoom - el.viewport.clientWidth / 2;
+      el.viewport.scrollTop = y * state.zoom - el.viewport.clientHeight / 2;
     }
 
     // Saving ---------------------------------------------------------------
-    const fileStem = () => "family-tree-" + normalize(state.idx.info(state.root).name).trim().replace(/[^a-z0-9]+/g, "-");
+    const slug = (text) => normalize(text).trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const fileStem = () => (state.style === "1"
+      ? "family-tree-" + slug(state.idx.info(state.root).name)
+      : "family-poster-" + slug(el.title.value || coupleName(state.couple)));
     const svgText = () => el.stage.querySelector("svg").outerHTML;
     function download(blob, name) {
       const url = URL.createObjectURL(blob);
@@ -827,36 +976,37 @@
         URL.revokeObjectURL(url);
         canvas.toBlob((blob) => {
           if (blob) { download(blob, fileStem() + ".png"); onStatus("Image saved."); }
-          else onStatus("Could not create the image: the tree is too large. Try Save SVG.");
+          else onStatus("Could not create the image: the drawing is too large. Try Save SVG.");
         }, "image/png");
       };
       image.onerror = () => { URL.revokeObjectURL(url); onStatus("Could not create the image. Try Save SVG."); };
       image.src = url;
     });
 
+    showStyleControls();
+
     return {
       load(tree) {
         state.idx = indexTree(tree);
         state.root = null;
-        state.layout = null;
-        state.selected = null;
+        state.couple = null;
+        state.title = null;
         state.keys = null;
-        el.stage.replaceChildren();
-        el.viewport.hidden = true;
-        el.selection.hidden = true;
-        el.savePng.disabled = true;
-        el.saveSvg.disabled = true;
-        el.empty.hidden = false;
-        el.empty.textContent = "Search for a person above to draw their tree.";
+        clearDrawing();
         el.search.disabled = false;
         el.search.value = "";
         el.matches.hidden = true;
       },
       choose,
+      chooseCouple,
     };
   }
 
-  const api = { create, indexTree, layoutTree, drawTree, counts, CARD_W };
+  const api = {
+    create, indexTree, layoutTree, drawTree, counts, CARD_W,
+    // Shared with poster.js (Style 2).
+    internals: { Shape, packRow, layoutDescendants, rng, branch, norm, f1, esc, wrapName, normalize },
+  };
   if (typeof module === "object" && module.exports) module.exports = api;
   else global.FamilyTree = api;
 })(typeof window !== "undefined" ? window : globalThis);

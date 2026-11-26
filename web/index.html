@@ -131,6 +131,7 @@
   .legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 8px; border: 1px solid var(--shadow); }
   .tree-empty { padding: 4px 0; color: var(--muted); }
   .selection { padding: 4px 6px; background: var(--white); }
+  #tree-title { width: 220px; }
   .selection label { white-space: nowrap; cursor: pointer; }
   .selection .hint { color: var(--muted); }
   .tree-viewport { flex: 1; min-height: 200px; overflow: auto; background: #e9dec4; cursor: grab; touch-action: none; }
@@ -211,6 +212,11 @@
         <input type="file" id="tree-file-input" accept=".ged,.json" class="visually-hidden" tabindex="-1" aria-hidden="true">
       </div>
       <div class="toolbar">
+        <label for="tree-style">Style:</label>
+        <select id="tree-style">
+          <option value="1">1 &middot; Tree around a person</option>
+          <option value="2">2 &middot; Poster of a couple</option>
+        </select>
         <label for="tree-search">Person:</label>
         <div class="search-box">
           <input id="tree-search" class="input" type="search" autocomplete="off" spellcheck="false"
@@ -221,14 +227,20 @@
         <div class="field" id="zoom-label">100%</div>
         <button id="zoom-in" class="small" aria-label="Zoom in">+</button>
         <button id="zoom-fit" class="small" title="Zoom to show the entire tree">Fit to max</button>
-        <label for="tree-generations">Generations:</label>
+        <label for="tree-generations">Generations up:</label>
         <select id="tree-generations">
           <option>3</option><option>4</option><option selected>5</option><option>6</option>
           <option>8</option><option>10</option><option value="0">All</option>
         </select>
+        <label for="tree-descendants" data-style="2">Down:</label>
+        <select id="tree-descendants" data-style="2">
+          <option>1</option><option>2</option><option>3</option><option value="0" selected>All</option>
+        </select>
+        <label for="tree-title" data-style="2">Title:</label>
+        <input id="tree-title" class="input" data-style="2" type="text" spellcheck="false" placeholder="Surnames">
         <button id="save-png" disabled>Save PNG</button>
         <button id="save-svg" disabled>Save SVG</button>
-        <span class="legend">Leaves:<i style="background:#a3ab4c"></i>mother's side<i style="background:#4e8e56"></i>father's side</span>
+        <span class="legend" data-style="1">Leaves:<i style="background:#a3ab4c"></i>mother's side<i style="background:#4e8e56"></i>father's side</span>
       </div>
       <div class="toolbar selection" id="tree-selection" hidden></div>
       <p class="tree-empty" id="tree-empty">Convert a file in <a href="#convert">Convert</a>, or open a .ged file above.</p>
@@ -248,6 +260,7 @@
 <noscript><p style="color:#fff">This page needs JavaScript to run the converter.</p></noscript>
 
 <script src="tree.js"></script>
+<script src="poster.js"></script>
 <script>
 // ------------------------------------------------------------------
 // Python (the converter in src/, run in the browser with Pyodide)
@@ -420,6 +433,7 @@ const treeView = FamilyTree.create({
   viewport: $("tree-viewport"), sizer: $("tree-sizer"), stage: $("tree-stage"),
   zoomIn: $("zoom-in"), zoomOut: $("zoom-out"), zoomFit: $("zoom-fit"), zoomLabel: $("zoom-label"),
   generations: $("tree-generations"), selection: $("tree-selection"),
+  style: $("tree-style"), descendants: $("tree-descendants"), title: $("tree-title"),
   savePng: $("save-png"), saveSvg: $("save-svg"),
 }, { onStatus: setStatus });
 

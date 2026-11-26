@@ -26,6 +26,14 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   is seeded by person ids so a tree always looks the same. People are semi-transparent medallions drawn
   on top of the wood. Click a person to get the Siblings / Their children / Grandchildren checkboxes.
   Default 5 generations (selector), Fit to max, Save PNG / Save SVG.
+  The tab has a Style selector: 1 = this tree around a person, 2 = the poster below.
+- `web/poster.js` - Style 2, the poster of a couple (needs tree.js; reuses its descendant layout and
+  branch drawing via `FamilyTree.internals`). The couple is in the centre (wife left, husband right);
+  descendants open downwards; the wife's ancestors open to the left and the husband's to the right as
+  sideways pedigree charts (one generation per column, father above mother, bracket lines, empty boxes
+  for unknown ancestors). A seeded decorative tree grows behind, and an editable "A Família ..." title
+  (default: each spouse's surname, or their father's) sits above the couple. Defaults: 4 generations up,
+  all down.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 
 `main.py` and `interpret.py` add `src/` to `sys.path`, so no install is needed.
