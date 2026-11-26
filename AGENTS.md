@@ -43,7 +43,8 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   per person (where they formed their own family, else among their parents' children); every other
   appearance is a short box with "→ p."; "◄ p." points to a spouse's parents, "↑ p." to where a chart's
   head appears as a child. Page breaks cut whole families (largest first); small charts share pages.
-  Cover, contents, charts, index of names. No notes are printed. Portuguese or English, three detail
+  Cover, contents, charts, index of names. Person numbers [n.º] follow the index order (alphabetical by
+  surname ignoring da/de/do…, then given name; no surname last), so they depend only on names. No notes are printed. Portuguese or English, three detail
   levels. Every full entry has a portrait photo frame (standard/detailed): filled from the person's
   `OBJE` photo when available (converted .ftz, or "Add photos…" matched by file name), empty otherwise.
   Unions: each person's unions in time order (∞¹ ∞² …); the full entry is with the first; unions drawn

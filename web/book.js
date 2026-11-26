@@ -399,17 +399,23 @@
                                                      : famPage.get(idx.parentFamily(pid)));
     const childPage = (pid) => famPage.get(idx.parentFamily(pid));
 
-    // Numbers in reading order of the full entries.
-    const number = new Map();
-    for (const c of charts) {
-      for (const b of c.boxes) {
-        const people = b.type === "couple" ? [b.a, b.b] : b.type === "single" ? [b.pid] : [];
-        for (const pid of people) {
-          const isFull = pid && (b.type === "single" || firstFamily.get(pid) === b.fam);
-          if (isFull && !number.has(pid)) number.set(pid, number.size + 1);
-        }
-      }
-    }
+    // Numbers follow the index order: alphabetical by surname (ignoring "da", "de"…), then given name;
+    // people without a surname come last. They depend only on the names, not on the layout or options.
+    const particles = /^(da|de|do|dos|das|d')\s+/i;
+    const nameParts = (pid) => {
+      const p = info(pid);
+      const sur = p.surname || "";
+      const given = sur && p.name.endsWith(sur) ? p.name.slice(0, -sur.length).trim() : p.name;
+      return { p, sur, given };
+    };
+    const indexKey = (pid) => {
+      const { p, sur, given } = nameParts(pid);
+      return sur ? normalize(sur.replace(particles, "") + " " + given) : "\uffff" + normalize(p.name);
+    };
+    const alphabetical = idx.people().map((pid) => [pid, indexKey(pid), info(pid).born || 0])
+      .sort((x, y) => x[1].localeCompare(y[1]) || x[2] - y[2] || x[0].localeCompare(y[0]))
+      .map(([pid]) => pid);
+    const number = new Map(alphabetical.map((pid, i) => [pid, i + 1]));
 
     // ---- Drawing ---------------------------------------------------------------------------
     const appearances = new Map();                  // person -> Map(page -> full?)
@@ -517,17 +523,13 @@
 
     // Index (needs the appearances recorded while drawing the charts).
     const indexStart = chartPages.length ? chartPages[chartPages.length - 1].no + 1 : pageNo;
-    const particles = /^(da|de|do|dos|das|d')\s+/i;
-    const entries = [...appearances.keys()].map((pid) => {
-      const p = info(pid);
-      const sur = p.surname || "";
-      const given = sur && p.name.endsWith(sur) ? p.name.slice(0, -sur.length).trim() : p.name;
-      // People without a surname go after everyone else, sorted by given name.
-      const key = sur ? normalize(sur.replace(particles, "") + " " + given) : "\uffff" + normalize(p.name);
+    // In number order, which is alphabetical.
+    const entries = alphabetical.filter((pid) => appearances.has(pid)).map((pid) => {
+      const { p, sur, given } = nameParts(pid);
       const label = sur ? `${sur}, ${given}` : `${p.name} (${L.noSurname})`;
       const pgs = [...appearances.get(pid)].sort((a, b) => a[0] - b[0]);
-      return { key, label: `${label}${p.years ? ` (${p.years})` : ""}`, no: number.get(pid), pages: pgs };
-    }).sort((a, b) => a.key.localeCompare(b.key));
+      return { label: `${label}${p.years ? ` (${p.years})` : ""}`, no: number.get(pid), pages: pgs };
+    });
     const perColumn = Math.floor((BODY - 10) / 3.1);
     const colW = (PAGE_W - 2 * ML - 6) / 2;
     const indexSvgs = [];
