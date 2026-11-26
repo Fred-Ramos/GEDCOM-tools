@@ -14,7 +14,8 @@ All commands run from the repository root. `SK=.claude/skills/gedcom-surnames/sc
 1. **Get the JSON tree.** Prefer `NAME_processed.json` (after the `gedcom-notes` skill), because
    birth and baptism places decide the naming convention.
 2. **Setup (rules section 0).** Run `python3 $SK/extract_names.py X.json --setup` and ask the user
-   about every abbreviation, compound surname and Spanish-looking place it lists (AskUserQuestion).
+   about every abbreviation, compound surname and Spanish-looking place it lists, and how many recent
+   generations should get missing surnames filled in (AskUserQuestion).
    Save the answers as `X_names/config.json`. Never guess what an abbreviation means, and never
    write anything from the user's family into this skill.
 3. **Clean (rules section 2).** `python3 $SK/extract_names.py X.json --next 4` applies the fixed cleaning rules and lists

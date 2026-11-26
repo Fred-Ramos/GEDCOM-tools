@@ -13,12 +13,18 @@ Run `extract_names.py TREE.json --setup`. It lists, from the tree itself:
 1. **abbreviations** found in surnames (e.g. `XY`, `A.G.S.`): ask the user what each means, or to keep it as is;
 2. **multi-word surnames** that children carry unchanged from their father: ask which ones are a
    family surname that passes on whole;
-3. **places that look Spanish-speaking**: ask which towns or regions name children the Spanish way.
+3. **places that look Spanish-speaking**: ask which towns or regions name children the Spanish way;
+4. **how many recent generations** should get missing surnames filled in. In older generations a
+   missing surname is often deliberate (people really had none, or only a married name is known), so
+   they are left as recorded. Counted back from the youngest birth in the tree, 28 years per
+   generation; missing birth years are estimated from relatives (parents + 28, children − 28,
+   spouses and siblings about the same).
 
 Save the answers in the answers folder (`X_names/config.json`):
 
 ```json
-{"abbreviations": {"XY": "Xavier Yanez"}, "compound_surnames": ["Costa Mendes"], "spanish_places": ["Town", "Region"]}
+{"abbreviations": {"XY": "Xavier Yanez"}, "compound_surnames": ["Costa Mendes"],
+ "spanish_places": ["Town", "Region"], "recent_generations": 4}
 ```
 
 Never guess what an abbreviation means.
@@ -57,8 +63,9 @@ they are how the records were written.
 
 ## 3. Inferring a missing birth surname
 
-Only for people whose birth surname is empty after cleaning. A recorded surname is never
-replaced by an inferred one.
+Only for people whose birth surname is empty after cleaning **and who belong to the recent
+generations** chosen in setup (section 0, `recent_generations`). Older people keep their names as
+recorded (cleaning still applies). A recorded surname is never replaced by an inferred one.
 
 Work **from the oldest generation down**, so an inferred parent surname can be passed on.
 

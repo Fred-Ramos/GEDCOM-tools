@@ -65,5 +65,6 @@ Existing data is never overwritten; disagreements are reported.
 
 ## Notes
 
--   Person images inside FTZ files are detected but currently not
-    exported.
+-   Photos inside the `.ftz` are saved to an `example_photos/` folder next to the `.ged`, which links
+    each person to their photo (GEDCOM `OBJE`/`FILE`). Keep the folder next to the `.ged`. In the web
+    page, **Save .zip** downloads the `.ged`, the `.json` and the photos together.

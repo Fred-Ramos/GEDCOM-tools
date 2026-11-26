@@ -51,9 +51,14 @@ def main():
         raise SystemExit(f"Answers for unknown people: {unknown[:5]}")
 
     stats = collections.Counter()
+    recent = config.get("recent_generations")
     for pid, person in tree.people.items():
         c = clean(person, config["abbreviations"])
         a = answers.get(pid, {})
+        if a and not tree.is_recent(pid, recent):
+            # Older generations keep their surnames as recorded: earlier answers for them are not used.
+            stats["answer skipped: older generation"] += 1
+            a = {}
         surname = squash(a["surname"]) if "surname" in a else c["surname"]
         if a.get("given"):                      # the answer may also correct the given name
             c["given"] = squash(a["given"])

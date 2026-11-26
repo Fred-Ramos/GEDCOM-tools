@@ -80,6 +80,15 @@
         surname: String(n.SURN || (String(n._NAME || "").match(/\/([^/]*)\//) || [])[1] || "").trim(),
         birth: { year: born, place: placeOf(p.BIRT) || placeOf(p.BAPM) },
         death: { year: died, place: placeOf(p.DEAT) || placeOf(p.BURI) },
+        occupation: asList(p.OCCU).map((o) => (o && typeof o === "object" ? o._NAME : o)).filter(Boolean).join(", "),
+        nick: (() => { const nk = first(n.NICK); return nk && typeof nk === "object" ? nk._NAME : nk || ""; })(),
+        // Path of the person's photo (GEDCOM OBJE/FILE), if any.
+        photo: (() => {
+          const o = first(p.OBJE);
+          let file = o && typeof o === "object" ? first(o.FILE) : null;
+          if (file && typeof file === "object") file = file._NAME;
+          return file || "";
+        })(),
       });
     }
 
@@ -119,15 +128,25 @@
         });
       },
 
-      // A couple: { id, wife, husband, children }.
+      // The family where the person is a child (or null).
+      parentFamily(id) {
+        const f = familyOf(id);
+        return f ? f._PDEF : null;
+      },
+
+      // A couple: { id, wife, husband, children, marriage: { year, place } }.
       family(famId) {
         const f = families.get(famId);
         if (!f) return null;
         const wife = pointer(f.WIFE);
         const husband = pointer(f.HUSB);
         return { id: famId, wife: info.has(wife) ? wife : null, husband: info.has(husband) ? husband : null,
-                 children: birthOrder(asList(f.CHIL).map(ref)) };
+                 children: birthOrder(asList(f.CHIL).map(ref)),
+                 marriage: { year: yearOf(f.MARR), place: placeOf(f.MARR) } };
       },
+
+      families: () => [...families.keys()],
+      people: () => [...info.keys()],
 
       search(query, limit = 100) {
         const words = normalize(query).split(/\s+/).filter(Boolean);

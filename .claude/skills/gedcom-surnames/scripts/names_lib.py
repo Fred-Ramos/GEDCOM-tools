@@ -19,7 +19,9 @@ SAINTS = {"São", "Santa", "Santo", "San", "Sant'", "Sant’"}
 # config.json, filled in by asking the user (see ../rules.md, section 0). Never put it here.
 SPANISH_COUNTRIES = (r"Espanha|España|Spain|M[eé]xico|Chile|Argentina|Uruguai|Uruguay|Col[oô]mbia|Peru|Per[uú]|"
                      r"Venezuela|Cuba|Bol[ií]via|Paraguai|Paraguay|Equador|Ecuador")
-CONFIG_DEFAULTS = {"abbreviations": {}, "compound_surnames": [], "spanish_places": []}
+CONFIG_DEFAULTS = {"abbreviations": {}, "compound_surnames": [], "spanish_places": [],
+                   "recent_generations": None}    # None = fill in surnames in every generation
+GENERATION_YEARS = 28
 TITLE = re.compile(r"^(Avó|Avô)\s+")
 NICK = re.compile(r"\s*['‘’]([^'‘’]+)['‘’]\s*")
 
@@ -100,6 +102,54 @@ class Tree:
 
     def sex(self, pid):
         return first(self.people[pid].get("SEX"))
+
+    def birth_year(self, pid):
+        """Recorded birth (or baptism) year, or None."""
+        p = self.people[pid]
+        for tag in ("BIRT", "BAPM"):
+            e = first(p.get(tag))
+            d = e.get("DATE") if isinstance(e, dict) else None
+            m = re.findall(r"\d{3,4}", str(d or ""))
+            if m:
+                return int(m[-1])
+        return None
+
+    def estimated_births(self):
+        """Birth years for everyone: recorded, or estimated from relatives (parents + 28, children - 28,
+        spouses and siblings about the same), repeated until nothing changes."""
+        if hasattr(self, "_births"):
+            return self._births
+        known = {pid: y for pid in self.people if (y := self.birth_year(pid))}
+        for _ in range(30):
+            added = {}
+            for pid in self.people:
+                if pid in known:
+                    continue
+                guesses = []
+                guesses += [known[x] + GENERATION_YEARS for x in self.parents(pid) if x in known]
+                for _fam, spouse, children in self.unions(pid):
+                    if spouse in known:
+                        guesses.append(known[spouse])
+                    guesses += [known[c] - GENERATION_YEARS for c in children if c in known]
+                guesses += [known[s] for s in self.siblings(pid) if s in known]
+                if guesses:
+                    added[pid] = round(sum(guesses) / len(guesses))
+            if not added:
+                break
+            known.update(added)
+        self._births = known
+        self._youngest = max((y for pid in self.people if (y := self.birth_year(pid))), default=None)
+        return known
+
+    def is_recent(self, pid, generations):
+        """In the `generations` most recent generations (counted back from the youngest birth in the
+        tree, GENERATION_YEARS per generation)? People with no date anywhere near them count as old."""
+        if not generations:
+            return True
+        births = self.estimated_births()
+        if pid not in births or self._youngest is None:
+            return False
+        return (self._youngest - births[pid]) // GENERATION_YEARS < generations
 
     def years(self, pid):
         p = self.people[pid]

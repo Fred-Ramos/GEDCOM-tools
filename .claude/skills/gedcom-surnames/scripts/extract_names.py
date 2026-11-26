@@ -156,8 +156,13 @@ def main():
 
     groups = {}
     nothing_known = []
+    recent = config.get("recent_generations")
+    older = 0
     for pid in tree.people:
         if surname(pid) or pid in answers:
+            continue
+        if not tree.is_recent(pid, recent):
+            older += 1                     # older generations keep their surnames as recorded
             continue
         result = proposal(pid)
         if not result:
@@ -173,6 +178,8 @@ def main():
     # ---- Rules section 4: women whose recorded surname may be a married name ---------
     for pid in tree.people:
         if pid in answers or tree.sex(pid) != "F" or not surname(pid) or cleaned[pid]["married"]:
+            continue
+        if not tree.is_recent(pid, recent):
             continue
         mother, father = tree.parents(pid)
         if not (mother and father and surname(mother) and surname(father)):
@@ -210,6 +217,9 @@ def main():
     print(f"Answered so far: {len(answers)} people")
     print(f"Open questions: {len(ordered)} ({sum(len(g['ids']) for g in ordered)} people); "
           f"no evidence, will stay empty: {len(nothing_known)}")
+    if recent:
+        print(f"Only the {recent} most recent generations are filled in: {older} older people without a "
+              f"surname stay as recorded.")
     for n, g in enumerate(ordered[: args.next], 1):
         print(f"\n[{n}] {g['key']} | gen {g['generation']} | {g['convention']} | {g['kind']} | {g['confidence']}")
         print("    people:  " + "; ".join(g["people"]))

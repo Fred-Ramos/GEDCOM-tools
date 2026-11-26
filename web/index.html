@@ -133,6 +133,22 @@
   .selection { padding: 4px 6px; background: var(--white); }
   #tree-title { width: 220px; }
   .cartouche { cursor: text; }
+
+  /* Family book: A4 pages, previewed here and printed (Print / Save as PDF). */
+  #panel-book:not([hidden]) { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  #book-title { width: 200px; }
+  #book-info { min-width: 160px; }
+  .book-preview { flex: 1; min-height: 200px; overflow: auto; padding: 16px; background: #808080; }
+  .book-preview svg { display: block; width: min(100%, 794px); height: auto; margin: 0 auto 16px;
+                      box-shadow: 2px 2px 0 var(--black); }
+  #print-root { display: none; }
+  @media print {
+    @page { size: A4; margin: 0; }
+    html, body { height: auto; background: #fff; }
+    body > *:not(#print-root) { display: none !important; }
+    #print-root { display: block; }
+    #print-root svg { display: block; width: 210mm; height: 297mm; break-after: page; }
+  }
   .selection label { white-space: nowrap; cursor: pointer; }
   .selection .hint { color: var(--muted); }
   .tree-viewport { flex: 1; min-height: 200px; overflow: auto; background: #e9dec4; cursor: grab; touch-action: none; }
@@ -166,6 +182,7 @@
     <div role="tablist" aria-label="Tools">
       <button role="tab" id="tab-convert" aria-controls="panel-convert" aria-selected="true">Convert</button>
       <button role="tab" id="tab-tree" aria-controls="panel-tree" aria-selected="false" tabindex="-1">Family tree</button>
+      <button role="tab" id="tab-book" aria-controls="panel-book" aria-selected="false" tabindex="-1">Book</button>
     </div>
 
     <!-- Tab 1: convert -->
@@ -188,11 +205,12 @@
           <dt>People</dt><dd id="s-people">&ndash;</dd>
           <dt>Families</dt><dd id="s-families">&ndash;</dd>
           <dt>People with notes</dt><dd id="s-notes">&ndash;</dd>
-          <dt>Photos (not exported)</dt><dd id="s-faces">&ndash;</dd>
+          <dt>Photos</dt><dd id="s-faces">&ndash;</dd>
         </dl>
         <div class="row">
           <button id="save-ged" disabled>Save .ged</button>
           <button id="save-json" disabled>Save .json</button>
+          <button id="save-zip" disabled title=".ged + .json + the photos folder the .ged links to">Save .zip (with photos)</button>
         </div>
       </fieldset>
 
@@ -250,6 +268,29 @@
       </div>
     </section>
 
+    <!-- Tab 3: family book -->
+    <section role="tabpanel" id="panel-book" aria-labelledby="tab-book" hidden>
+      <div class="toolbar">
+        <label for="book-lang">Language:</label>
+        <select id="book-lang"><option value="pt">Português</option><option value="en">English</option></select>
+        <label for="book-level">Detail:</label>
+        <select id="book-level">
+          <option value="compact">Compact (name and years)</option>
+          <option value="standard" selected>Standard (+ places, marriage)</option>
+          <option value="detailed">Detailed (+ occupation)</option>
+        </select>
+        <label for="book-title">Title:</label>
+        <input id="book-title" class="input" type="text" spellcheck="false" placeholder="Livro de Família">
+        <label><input type="checkbox" id="book-photos" checked> Photo frames</label>
+        <button id="book-add-photos" title="Photos named like the person's photo link in the .ged, e.g. 492679.jpg">Add photos&hellip;</button>
+        <input type="file" id="book-photo-input" accept="image/*" multiple class="visually-hidden" tabindex="-1" aria-hidden="true">
+        <button id="book-print" disabled>Print / Save as PDF</button>
+        <div class="field" id="book-info">No tree yet</div>
+      </div>
+      <p class="tree-empty" id="book-empty">Convert a file in <a href="#convert">Convert</a>, or open a .ged file in <a href="#tree">Family tree</a>.</p>
+      <div class="book-preview" id="book-preview" hidden></div>
+    </section>
+
     <div class="statusbar" role="status" aria-live="polite">
       <div id="status">Loading Python&hellip;</div>
       <div id="python">Python: loading</div>
@@ -258,10 +299,13 @@
   </div>
 </div>
 
+<div id="print-root"></div>
+
 <noscript><p style="color:#fff">This page needs JavaScript to run the converter.</p></noscript>
 
 <script src="tree.js"></script>
 <script src="poster.js"></script>
+<script src="book.js"></script>
 <script>
 // ------------------------------------------------------------------
 // Python (the converter in src/, run in the browser with Pyodide)
@@ -273,15 +317,33 @@ import sys, json, zipfile
 from io import BytesIO
 sys.path.insert(0, "/app")
 from gedcom_tools import __version__
-from gedcom_tools.converter import ftz_to_json, json_to_gedcom, inspect_ftz, gedcom_to_json
+from gedcom_tools.converter import ftz_to_json, json_to_gedcom, inspect_ftz, gedcom_to_json, ftz_photos
+import base64
+LAST = {}
 
-def web_convert(js_bytes):
+def web_convert(js_bytes, stem):
     data = js_bytes.to_bytes()
-    tree = ftz_to_json(data)
+    photos = ftz_photos(data)
+    photo_dir = f"{stem}_photos"
+    tree = ftz_to_json(data, photo_dir=photo_dir if photos else None)
     with zipfile.ZipFile(BytesIO(data)) as archive:
         name, faces = inspect_ftz(archive)
-    return json.dumps({"name": name, "faces": len(faces), "tree": tree,
-                       "gedcom": json_to_gedcom(tree)}, ensure_ascii=False)
+    gedcom = json_to_gedcom(tree)
+    files = {f"{photo_dir}/{pid}.jpg": image for pid, image in photos.items()}
+    LAST.update(stem=stem, gedcom=gedcom, tree=tree, photos=files)
+    return json.dumps({"name": name, "faces": len(faces), "tree": tree, "gedcom": gedcom,
+                       "photos": {path: base64.b64encode(image).decode() for path, image in files.items()}},
+                      ensure_ascii=False)
+
+def web_zip():
+    """The last conversion as a .zip: the .ged, the .json and the photos folder the .ged links to."""
+    out = BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"{LAST['stem']}.ged", LAST["gedcom"])
+        z.writestr(f"{LAST['stem']}.json", json.dumps(LAST["tree"], ensure_ascii=False, indent=2))
+        for path, image in LAST["photos"].items():
+            z.writestr(path, image)
+    return out.getvalue()
 
 def web_read_ged(js_bytes):
     raw = js_bytes.to_bytes()
@@ -303,9 +365,11 @@ async function startPython() {
   pyodide.runPython(GLUE);
   const webConvert = pyodide.globals.get("web_convert");
   const webReadGed = pyodide.globals.get("web_read_ged");
+  const webZip = pyodide.globals.get("web_zip");
   return {
     version: pyodide.globals.get("__version__"),
-    convert: (bytes) => JSON.parse(webConvert(bytes)),
+    convert: (bytes, stem) => JSON.parse(webConvert(bytes, stem)),
+    zip: () => { const proxy = webZip(); const bytes = proxy.toJs(); proxy.destroy(); return bytes; },
     readGed: (bytes) => JSON.parse(webReadGed(bytes)),
   };
 }
@@ -374,9 +438,10 @@ async function convertFile(file) {
   $("filename").textContent = file.name;
   setStatus(`Converting ${file.name}…`);
   try {
-    const result = state.python.convert(new Uint8Array(await file.arrayBuffer()));
-    state.result = result;
     state.stem = file.name.replace(/\.ftz$/i, "");
+    const result = state.python.convert(new Uint8Array(await file.arrayBuffer()), state.stem);
+    state.result = result;
+    for (const [path, b64] of Object.entries(result.photos || {})) addPhoto(path, "data:image/jpeg;base64," + b64);
     showResult(result);
     setStatus(`Converted ${file.name}.`);
   } catch (error) {
@@ -393,6 +458,7 @@ function showResult({ name, faces, tree, gedcom }) {
   $("s-faces").textContent = faces;
   $("save-ged").disabled = false;
   $("save-json").disabled = false;
+  $("save-zip").disabled = false;
 
   const lines = gedcom.split("\n");
   $("preview").value = lines.slice(0, PREVIEW_LINES).join("\n") +
@@ -400,6 +466,7 @@ function showResult({ name, faces, tree, gedcom }) {
 
   treeView.load(tree);
   $("tree-file").textContent = `${state.stem}.ged (from Convert)`;
+  setBookTree(tree, `${state.stem}.ged`);
 }
 
 $("open").addEventListener("click", () => $("file").click());
@@ -407,6 +474,8 @@ $("file").addEventListener("change", () => {
   if ($("file").files[0]) convertFile($("file").files[0]);
   $("file").value = "";
 });
+$("save-zip").addEventListener("click", () =>
+  save(state.python.zip(), state.stem + ".zip", "application/zip"));
 $("save-ged").addEventListener("click", () =>
   save(state.result.gedcom, state.stem + ".ged", "text/plain;charset=utf-8"));
 $("save-json").addEventListener("click", () =>
@@ -450,12 +519,80 @@ async function loadTreeFile(file) {
     if (!tree || !Array.isArray(tree.INDI) || !tree.INDI.length) throw new Error("no people found in this file");
     treeView.load(tree);
     $("tree-file").textContent = file.name;
+    setBookTree(tree, file.name);
     setStatus(`Opened ${file.name}: ${tree.INDI.length} people. Search for a person to draw the tree.`);
   } catch (error) {
     setStatus("Error: " + lastLine(error));
   }
 }
 $("tree-open").addEventListener("click", () => $("tree-file-input").click());
+
+// Photos by file name: from the converted .ftz, or added in the Book tab.
+const photoStore = new Map();
+function addPhoto(path, url) {
+  photoStore.set(path, url);
+  photoStore.set(path.split("/").pop(), url);
+}
+
+// Family book (web/book.js): uses the same tree as the Family tree tab.
+const book = { tree: null, label: "", built: null, dirty: false, photoPaths: new Map() };
+function setBookTree(tree, label) {
+  book.photoPaths = new Map();
+  for (const p of tree.INDI || []) {
+    let o = Array.isArray(p.OBJE) ? p.OBJE[0] : p.OBJE;
+    let file = o && typeof o === "object" ? (Array.isArray(o.FILE) ? o.FILE[0] : o.FILE) : null;
+    if (file && typeof file === "object") file = file._NAME;
+    if (file) book.photoPaths.set(p._PDEF, String(file));
+  }
+  book.tree = tree;
+  book.label = label;
+  book.dirty = true;
+  if (!$("panel-book").hidden) buildBook();
+}
+function buildBook(note = "") {
+  if (!book.tree) return;
+  const lang = $("book-lang").value;
+  $("book-title").placeholder = FamilyBook.LABELS[lang].title;
+  setStatus("Building the book…");
+  // Let the status bar paint before the (short) build.
+  setTimeout(() => {
+    const photoFor = (id) => {
+      const path = book.photoPaths.get(id);
+      return path ? photoStore.get(path) || photoStore.get(path.split(/[\\/]/).pop()) || null : null;
+    };
+    const result = FamilyBook.buildBook(book.tree, { lang, level: $("book-level").value, title: $("book-title").value,
+                                                     photos: $("book-photos").checked, photoFor });
+    book.built = result;
+    book.dirty = false;
+    $("book-preview").innerHTML = result.pages.join("");
+    $("book-preview").hidden = false;
+    $("book-empty").hidden = true;
+    $("book-print").disabled = false;
+    $("book-info").textContent = `${book.label}: ${result.stats.pages} pages`;
+    setStatus(`Book ready: ${result.stats.pages} pages, ${result.stats.people} people, ${result.stats.chapters} chapters.` +
+              (note ? ` ${note}` : ""));
+  }, 20);
+}
+for (const id of ["book-lang", "book-level", "book-photos"]) $(id).addEventListener("change", () => buildBook());
+$("book-add-photos").addEventListener("click", () => $("book-photo-input").click());
+$("book-photo-input").addEventListener("change", async () => {
+  const files = [...$("book-photo-input").files];
+  for (const f of files) {
+    addPhoto(f.name, await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); }));
+  }
+  $("book-photo-input").value = "";
+  const linked = [...book.photoPaths.values()].filter((p) => files.some((f) => p.split(/[\\/]/).pop() === f.name)).length;
+  buildBook(`Added ${files.length} photos; ${linked} match a person's photo link.`);
+});
+let bookTitleTimer = null;
+$("book-title").addEventListener("input", () => { clearTimeout(bookTitleTimer); bookTitleTimer = setTimeout(() => buildBook(), 500); });
+$("book-print").addEventListener("click", () => {
+  $("print-root").innerHTML = book.built.pages.join("");
+  window.print();
+});
+// Build when the Book tab becomes visible (by click, arrow keys or link) and something changed.
+new MutationObserver(() => { if (!$("panel-book").hidden && book.dirty) buildBook(); })
+  .observe($("panel-book"), { attributes: true, attributeFilter: ["hidden"] });
 $("tree-file-input").addEventListener("change", () => {
   if ($("tree-file-input").files[0]) loadTreeFile($("tree-file-input").files[0]);
   $("tree-file-input").value = "";

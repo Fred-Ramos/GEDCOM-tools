@@ -1,3 +1,4 @@
+import os
 import re
 import zipfile
 from io import BytesIO
@@ -164,7 +165,9 @@ def build_indexes(people_by_id: Dict[int, Person_FTT],
 
 def to_json(people_by_id: Dict[int, Person_FTT],
               couples_by_id: Dict[int, Couple_FTT],
-              lang: str = "en"):
+              lang: str = "en",
+              photos: Dict[int, str] = None):
+    """photos: person id -> photo file path, written as a GEDCOM multimedia link (OBJE/FILE)."""
 
     # Start document root
     DOCUMENT = {} # Main JSON   
@@ -255,6 +258,10 @@ def to_json(people_by_id: Dict[int, Person_FTT],
                 T._PREF: fam_ptr[couple_id],
             }
             node[T.FAMILY_AS_SPOUSE].append(subnode)
+
+        # Photo (a link to the image file next to the .ged)
+        if photos and person_id in photos:
+            node[T.OBJECT] = {T.FILE: {T._NAME: photos[person_id], T.FORM: "jpg"}}
 
         # Notes
         note_text = p.note or p.addition
@@ -475,9 +482,25 @@ def inspect_ftz(archive: zipfile.ZipFile) -> Tuple[str, List[str]]:
     faces = [n for n in names if n.startswith(faces_prefixes) and n.lower().endswith(".jpg")]
     return folder_name, faces
 
-def ftz_to_json(data: bytes, lang: str = "English") -> dict:
+def ftz_photos(data: bytes) -> Dict[int, bytes]:
+    """
+    The photos inside an .ftz archive: person id -> JPEG bytes.
+    The app stores each photo as face/<person id>.jpg (or faces/).
+    """
+    photos = {}
+    with zipfile.ZipFile(BytesIO(bytes(data))) as archive:
+        _, faces = inspect_ftz(archive)
+        for name in faces:
+            stem = os.path.splitext(os.path.basename(name))[0]
+            if stem.isdigit():
+                photos[int(stem)] = archive.read(name)
+    return photos
+
+def ftz_to_json(data: bytes, lang: str = "English", photo_dir: str = None) -> dict:
     """
     Convert the raw bytes of an .ftz archive into GEDCOM JSON.
+    photo_dir: when given, people with a photo get a link to "<photo_dir>/<person id>.jpg"
+    (the caller saves the files there, see ftz_photos).
     Raises ValueError when the archive is not a valid family tree.
     """
     try:
@@ -495,11 +518,14 @@ def ftz_to_json(data: bytes, lang: str = "English") -> dict:
     except UnicodeDecodeError:
         raise ValueError("node.ftt is not valid UTF-8 text.")
     people_by_id, couples_by_id = parse_node_ftt(text)
-    return to_json(people_by_id, couples_by_id, lang=lang)
+    photos = None
+    if photo_dir:
+        photos = {pid: f"{photo_dir}/{pid}.jpg" for pid in ftz_photos(data) if pid in people_by_id}
+    return to_json(people_by_id, couples_by_id, lang=lang, photos=photos)
 
-def ftz_to_gedcom(data: bytes, lang: str = "English") -> str:
+def ftz_to_gedcom(data: bytes, lang: str = "English", photo_dir: str = None) -> str:
     """Convert the raw bytes of an .ftz archive into GEDCOM 5.5.1 text."""
-    return json_to_gedcom(ftz_to_json(data, lang))
+    return json_to_gedcom(ftz_to_json(data, lang, photo_dir))
 
 # ---------------------------
 # Main convert flow (CLI: reads the .ftz and writes .json + .ged)
@@ -517,18 +543,26 @@ def convert(file: str, output_name: str):
         with zipfile.ZipFile(BytesIO(data)) as archive:
             folder_name, faces = inspect_ftz(archive)
         print(f"Found Family Tree: {folder_name}")
-        if faces:
-            print(f"Faces folder found with {len(faces)} image(s).")
-            print("Faces list:")
-            for fname in faces:
-                print(" -", fname)
-        else:
-            print("No faces folder available.")
-
-        gedcom_json = ftz_to_json(data)
+        photos = ftz_photos(data)
+        # Photos go to a folder next to the .ged, which links to them with relative paths.
+        photo_dir = os.path.basename(output_name) + "_photos"
+        gedcom_json = ftz_to_json(data, photo_dir=photo_dir if photos else None)
     except (ValueError, zipfile.BadZipFile) as e:
         print(f"⚠️ {e}")
         return None
+
+    if photos:
+        folder = output_name + "_photos"
+        os.makedirs(folder, exist_ok=True)
+        linked = {int(os.path.splitext(os.path.basename(
+            (p.get(T.OBJECT) or {}).get(T.FILE, {}).get(T._NAME, "x")))[0] or 0)
+            for p in gedcom_json[T.INDIVIDUAL] if T.OBJECT in p}
+        for pid, image in photos.items():
+            with open(os.path.join(folder, f"{pid}.jpg"), "wb") as f:
+                f.write(image)
+        print(f"Photos: {len(photos)} saved to {folder}/ ({len(linked)} linked to people)")
+    else:
+        print("No photos in this file.")
 
     json_name = output_name + ".json"
     with open(json_name, "w", encoding="utf-8") as f:
