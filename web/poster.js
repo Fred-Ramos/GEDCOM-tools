@@ -66,23 +66,23 @@
     const card = (id, row, kind, line) => ({ key: serial++, id, row, kind, line, x: 0 });
     const kids = downGens > 0 ? fam.children.map((c) => layoutDescendants(idx, c, 1, downGens - 1, "r", card)) : [];
     const desc = packRow(kids);
-    let descHalf = 0;
     if (desc.cards.length) {
       const xs = desc.cards.map((c) => c.x);
       desc.shift(-(Math.min(...xs) + Math.max(...xs)) / 2);
-      descHalf = Math.max(...desc.cards.map((c) => Math.abs(c.x))) + BW / 2;
     }
 
     const tLines = titleLines(title);
     const titleW = Math.max(360, ...tLines.map((l) => l.length * 19 + 90));
-    const innerX = Math.max(GAPC / 2 + 1.5 * BW + 60, descHalf + 60 + BW / 2, titleW / 2 + 40 + BW / 2);
+    const innerX = Math.max(GAPC / 2 + 1.5 * BW + 60, titleW / 2 + 40 + BW / 2);
 
     // Vertical positions.
     const H = upGens > 0 ? Math.pow(2, upGens) * SLOT : BH;
     const titleTop = MARGIN;
     const coupleY = Math.max(MARGIN + H / 2, titleTop + TITLE_H + 50 + BH / 2);
     const sideTop = coupleY - H / 2;
-    const rowY = (row) => coupleY + BH / 2 + DESC_GAP + (row - 1) * (BH + DESC_GAP) + BH / 2;
+    const rowTop = new Map();                      // descendant row -> y of its top, set further down
+    const rowY = (row) => rowTop.get(row) + BH / 2;
+    const obstacles = [];                          // ancestor boxes and brackets the descendants must avoid
 
     // Centre couple: wife left, husband right.
     const wifeX = -(GAPC / 2 + BW / 2);
@@ -108,10 +108,37 @@
           const mid = (from + to) / 2;
           lines += `M${f1(from)} ${f1(child.y)}H${f1(mid)}M${f1(mid)} ${f1(father.y)}V${f1(mother.y)}` +
                    `M${f1(mid)} ${f1(father.y)}H${f1(to)}M${f1(mid)} ${f1(mother.y)}H${f1(to)}`;
+          obstacles.push({ x1: Math.min(from, to), x2: Math.max(from, to), y1: father.y, y2: mother.y });
         });
-        for (const b of gen) boxes.push({ ...b, kind: "ancestor" });
+        for (const b of gen) {
+          boxes.push({ ...b, kind: "ancestor" });
+          obstacles.push({ x1: b.x - BW / 2, x2: b.x + BW / 2, y1: b.y - BH / 2, y2: b.y + BH / 2 });
+        }
         prev = gen;
       }
+    }
+
+    // Descendant rows: imagine the two diagonals of the ancestors' rectangle, crossing at the couple.
+    // Each row goes down until it fits inside the lower triangle between them (which widens as it
+    // goes down) and touches no ancestor box or bracket.
+    const sideHalf = innerX + (upGens - 1) * CX + BW / 2;
+    const slope = upGens > 0 ? sideHalf / (H / 2) : Infinity;   // half-width gained per pixel down
+    const CLEAR = 14;
+    let next = coupleY + BH / 2 + DESC_GAP;
+    let descHalf = 0;
+    for (const r of [...desc.rows.keys()].sort((a, b) => a - b)) {
+      const [left, right] = desc.rows.get(r);
+      const reach = Math.max(-left, right);
+      descHalf = Math.max(descHalf, reach);
+      let y = Math.max(next, coupleY + reach / slope);
+      for (let guard = 0; guard < 1000; guard++) {
+        const hit = obstacles.find((o) => o.x1 < right + CLEAR && o.x2 > left - CLEAR &&
+                                          o.y1 < y + BH + CLEAR && o.y2 > y - DESC_GAP / 2 - CLEAR);
+        if (!hit) break;
+        y = hit.y2 + DESC_GAP / 2 + CLEAR;
+      }
+      rowTop.set(r, y);
+      next = y + BH + DESC_GAP;
     }
 
     // Descendants and their lines.
