@@ -22,6 +22,7 @@
   const LABELS = {
     pt: {
       title: "Livro de Família", contents: "Índice geral", index: "Índice onomástico", family: "Família",
+      familyOf: "Família de",
       otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
       people: "pessoas", families: "famílias",
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
@@ -32,6 +33,7 @@
     },
     en: {
       title: "Family Book", contents: "Contents", index: "Index of names", family: "Family",
+      familyOf: "Family of",
       otherFamilies: "Other families", separated: "sep.",
       marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
       people: "people", families: "families",
@@ -216,6 +218,12 @@
       return [row(parts[0], {}, markers), row(parts[1])];
     }
 
+    // Chapter heading: "Família <surname>"; without a surname, "Família de <name>".
+    const familyHeading = (pid) => {
+      if (!pid) return `${L.family} ?`;
+      const sur = info(pid).surname;
+      return sur ? `${L.family} ${sur}` : `${L.familyOf} ${info(pid).name}`;
+    };
     const sup = (n) => (n ? String(n).replace(/\d/g, (d) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]) : "");
     const divorceText = (F) => {
       const dv = fam.get(F).divorce;
@@ -479,10 +487,8 @@
       const y0 = MT + c.y;
       let s = "";
       if (c.caption) {
-        const head = groupVia.get(c.root);
-        const surname = head && info(head).surname;
         s += `<text x="${ML}" y="${f2(y0 + 4.2)}" font-size="3.6" font-weight="bold" fill="#3a2a18">` +
-             `${esc(`${L.family} ${surname || (head ? info(head).name : "?")}`)}</text>` +
+             `${esc(familyHeading(groupVia.get(c.root)))}</text>` +
              `<line x1="${ML}" y1="${f2(y0 + 5.6)}" x2="${PAGE_W - ML}" y2="${f2(y0 + 5.6)}" stroke="#b8a46a" stroke-width="0.3"/>`;
       }
       let lines = "";
@@ -555,9 +561,8 @@
       if (c.caption) {
         const f = fam.get(groups.get(c.root)[0]);
         const names = [f.husband, f.wife].filter(Boolean).map((x) => info(x).name).join(" & ");
-        const head = f.husband || f.wife;
-        const surname = head && info(head).surname;
-        toc.push([`${L.family} ${surname || names}`, surname ? names : "", c.page]);
+        const head = groupVia.get(c.root);
+        toc.push([familyHeading(head), head && info(head).surname ? names : "", c.page]);
       }
     }
     const firstSmall = charts.find((c) => c.isRoot && !c.caption);
