@@ -48,6 +48,22 @@
     return years ? years[years.length - 1] : null;
   }
 
+  // The year as shown, with the GEDCOM qualifier: BEF 1920 -> "a. 1920" (antes), AFT -> "d. 1920"
+  // (depois), ABT/CAL/EST -> "c. 1920" (cerca), BET 1850 AND 1860 -> "1850/1860".
+  const QUALIFIERS = { BEF: "a.", AFT: "d.", ABT: "c.", CAL: "c.", EST: "c." };
+  function yearLabel(event) {
+    const year = yearOf(event);
+    if (!year) return null;
+    const e = first(event);
+    let date = first(e.DATE);
+    if (date && typeof date === "object") date = date._NAME;
+    const text = String(date).trim().toUpperCase();
+    const bet = text.match(/^BET\b.*?(\d{3,4})\s+AND\b.*?(\d{3,4})/);
+    if (bet) return `${bet[1]}/${bet[2]}`;
+    const q = QUALIFIERS[text.split(/\s+/)[0]];
+    return q ? `${q} ${year}` : year;
+  }
+
   function placeOf(event) {
     const e = first(event);
     let place = e && typeof e === "object" ? first(e.PLAC) : null;
@@ -73,13 +89,14 @@
                     String(n._NAME || "").replace(/\//g, " ")).replace(/\s+/g, " ").trim() || "(no name)";
       const born = yearOf(p.BIRT);
       const died = yearOf(p.DEAT);
-      const years = born && died ? `${born}–${died}` : born ? `${born}–` : died ? `–${died}` :
+      const bornL = yearLabel(p.BIRT), diedL = yearLabel(p.DEAT);
+      const years = born && died ? `${bornL}–${diedL}` : born ? `${bornL}–` : died ? `–${diedL}` :
                     p.DEAT ? "deceased" : "";
       info.set(id, {
         id, name, years, born: born ? Number(born) : null, sex: first(p.SEX), search: normalize(name),
         surname: String(n.SURN || (String(n._NAME || "").match(/\/([^/]*)\//) || [])[1] || "").trim(),
-        birth: { year: born, place: placeOf(p.BIRT) || placeOf(p.BAPM) },
-        death: { year: died, place: placeOf(p.DEAT) || placeOf(p.BURI) },
+        birth: { year: bornL, place: placeOf(p.BIRT) || placeOf(p.BAPM) },
+        death: { year: diedL, place: placeOf(p.DEAT) || placeOf(p.BURI) },
         occupation: asList(p.OCCU).map((o) => (o && typeof o === "object" ? o._NAME : o)).filter(Boolean).join(", "),
         nick: (() => { const nk = first(n.NICK); return nk && typeof nk === "object" ? nk._NAME : nk || ""; })(),
         // Free-text note(s), joined; a NOTE may be a string, an object with _NAME, or a list of those.
@@ -145,9 +162,10 @@
         const husband = pointer(f.HUSB);
         return { id: famId, wife: info.has(wife) ? wife : null, husband: info.has(husband) ? husband : null,
                  children: birthOrder(asList(f.CHIL).map(ref)),
-                 marriage: { year: yearOf(f.MARR), place: placeOf(f.MARR) },
+                 // year: as shown (with a./d./c.); num: the plain year, for sorting.
+                 marriage: { year: yearLabel(f.MARR), num: Number(yearOf(f.MARR)) || null, place: placeOf(f.MARR) },
                  // DIV is "Y" (divorced, no details) or an event with DATE/PLAC.
-                 divorce: f.DIV ? { year: yearOf(f.DIV), place: placeOf(f.DIV) } : null };
+                 divorce: f.DIV ? { year: yearLabel(f.DIV), place: placeOf(f.DIV) } : null };
       },
 
       families: () => [...families.keys()],

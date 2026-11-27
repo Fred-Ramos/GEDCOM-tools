@@ -8,6 +8,17 @@ already exist (`existing`) and the families where the person is a spouse (`famil
 **Golden rule: never invent.** Only extract what the note states. When a sentence is
 ambiguous, leave it in the note. Lost information is worse than an unextracted note.
 
+## Uncertain statements - ask the user
+A clear fact stated with doubt ("terá falecido em X", "provavelmente", "possivelmente",
+"talvez", a "?" next to the value, "(net)" or another weak source) is **not** skipped and **not**
+extracted on your own. Do not put it in the patch: list it (pointer, the sentence, what you would
+extract) and, after each batch, ask the user about each one: extract it, or leave it in the note.
+- Yes → extract it and keep in the note the words that show the doubt and the source, so the
+  uncertainty is not lost. Example (invented): "Terá falecido em Évora (net), durante uma viagem." →
+  `"DEAT": {"PLAC": "Évora"}`, `"NOTE": "Local de falecimento incerto (net), durante uma viagem."`
+- No → leave the sentence in the note as it is.
+Ambiguous sentences (not clear what they say) still stay in the note without asking.
+
 ## What to extract
 
 | Note says | GEDCOM | Where |
@@ -63,7 +74,7 @@ GEDCOM format: `D Mon YYYY`, `Mon YYYY` or `YYYY`, with English 3-letter months
 - `12 março 1995`, `dia 3 de maio de 1980`, `7 de agosto de 1980` → `12 Mar 1995`, `3 May 1980`, `7 Aug 1980`
 - Month names: janeiro, fevereiro, março, abril, maio, junho, julho, agosto,
   setembro, outubro, novembro, dezembro (also old spellings like "Março", "Agôsto")
-- `antes de 1850` → `BEF 1850`; `depois de 1850` → `AFT 1850`;
+- `antes de 1850`, `até 1850` ("faleceu até 1850": died by 1850) → `BEF 1850`; `depois de 1850` → `AFT 1850`;
   `cerca de 1900`, `c. 1900`, `por volta de 1900` → `ABT 1900`;
   `entre 1850 e 1860` → `BET 1850 AND 1860`
 - A baptism date is **not** a birth date. Never copy `BAPM.DATE` into `BIRT.DATE`.

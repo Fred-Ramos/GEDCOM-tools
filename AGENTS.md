@@ -14,7 +14,9 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
 - `web/tree.js` - the Family tree tab (plain JS, also loadable in Node for tests). It reads the tree
   converted in the Convert tab by default, or a `.zip`/`.ged`/`.json` opened in the tab (`.ged` goes through
   `gedcom_to_json` in Pyodide; a `.zip` through `read_zip`, which also brings its photos). Values may be strings, objects or lists depending on the program that
-  wrote the file, so read them through its `first`/`pointer`/`ref` helpers. Rule: search one person;
+  wrote the file, so read them through its `first`/`pointer`/`ref` helpers. Years are shown with the
+  GEDCOM qualifier (`yearLabel`): BEF → "a. 1920", AFT → "d. 1920", ABT/CAL/EST → "c. 1920",
+  BET → "1850/1860" (the book in English writes bef./aft.); `yearOf` gives the plain year for sorting. Rule: search one person;
   show them and all ancestors; each ancestor (and the chosen person) has checkboxes Siblings (full siblings
   only) → Their children (of all those siblings) → Grandchildren; never more than 2 generations below a
   sibling. Spouses are shown for anyone whose children are shown; couples are woman left, man right.

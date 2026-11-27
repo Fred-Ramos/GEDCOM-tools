@@ -31,7 +31,8 @@
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
         "→ p. página onde está a entrada completa ou a continuação da família.",
         "◄ p. página onde estão os pais do cônjuge.   ↑ p. página onde a pessoa aparece como filho/a.",
-        "* nascimento ou batismo   † morte ou enterro   ∞ casamento (∞¹ ∞² ordem)   sep. separados   ? desconhecido"],
+        "* nascimento ou batismo   † morte ou enterro   ∞ casamento (∞¹ ∞² ordem)   sep. separados   ? desconhecido",
+        "a. antes de   d. depois de   c. cerca de   1850/1860 entre esses anos"],
     },
     en: {
       title: "Family Book", contents: "Contents", index: "Index of names", family: "Family",
@@ -43,7 +44,8 @@
         "Every person has one full entry, with their number in square brackets [no.].",
         "→ p. page with the full entry, or where the family continues.",
         "◄ p. page with the spouse's parents.   ↑ p. page where the person appears as a child.",
-        "* birth or baptism   † death or burial   ∞ marriage (∞¹ ∞² order)   sep. separated   ? unknown"],
+        "* birth or baptism   † death or burial   ∞ marriage (∞¹ ∞² order)   sep. separated   ? unknown",
+        "bef. before   aft. after   c. about   1850/1860 between those years"],
     },
   };
 
@@ -110,8 +112,8 @@
     const unionsOf = new Map();
     for (const pid of idx.people()) {
       const list = idx.unions(pid).map((u) => u.famId).filter((id) => fam.has(id));
-      if (list.length > 1 && list.every((id) => fam.get(id).marriage.year)) {
-        list.sort((x, y) => Number(fam.get(x).marriage.year) - Number(fam.get(y).marriage.year));
+      if (list.length > 1 && list.every((id) => fam.get(id).marriage.num)) {
+        list.sort((x, y) => fam.get(x).marriage.num - fam.get(y).marriage.num);
       }
       if (list.length) unionsOf.set(pid, list);
     }
@@ -161,7 +163,14 @@
     roots.sort((a, b) => groupSize(b) - groupSize(a) || groupChildren(b) - groupChildren(a));
 
     // ---- What each box says (measured, wrapped; independent of page numbers) ---------
-    const info = (pid) => idx.info(pid);
+    // Years come from tree.js with Portuguese qualifiers (a. antes, d. depois, c. cerca); in English
+    // the book writes bef. / aft. instead ("c." is the same).
+    const yr = (t) => (lang === "en" && t ? String(t).replace(/(^|[\s(–])a\. /g, "$1bef. ").replace(/(^|[\s(–])d\. /g, "$1aft. ") : t);
+    const info = (pid) => {
+      const p = idx.info(pid);
+      return lang === "en" ? { ...p, years: yr(p.years), birth: { ...p.birth, year: yr(p.birth.year) },
+                               death: { ...p.death, year: yr(p.death.year) } } : p;
+    };
     const displayName = (pid) => {
       const p = info(pid);
       return level !== "compact" && p.nick ? `${p.name} '${p.nick}'` : p.name;
@@ -233,7 +242,7 @@
     const divorceText = (F) => {
       const dv = fam.get(F).divorce;
       // Shown as "separated": a couple may have split without ever marrying.
-      return dv ? ` · ${L.separated}${dv.year ? ` ${dv.year}` : ""}` : "";
+      return dv ? ` · ${L.separated}${dv.year ? ` ${yr(dv.year)}` : ""}` : "";
     };
 
     const contentCache = new Map();
@@ -258,7 +267,7 @@
         const spouseParents = b.b && idx.parentFamily(b.b) ? goto("◄ p.", () => childPage(b.b)) : null;
         const n = unionNo(b.a, b.fam);
         const nameA = b.second && !fullA ? `${displayName(b.a)} (${L.marriageNo(n)})` : displayName(b.a);
-        const married = level !== "compact" && f.marriage.year ? `${f.marriage.year} ` : "";
+        const married = level !== "compact" && f.marriage.year ? `${yr(f.marriage.year)} ` : "";
         const nameB = `∞${sup(n)} ${married}${b.b ? displayName(b.b) : "?"}${divorceText(b.fam)}`;
         // At a full entry, every other union of that person that is not stacked right here.
         const otherUnions = (pid) => (unionsOf.get(pid) || [])
@@ -602,7 +611,7 @@
              `<text x="${PAGE_W - ML}" y="${f2(y)}" font-size="2.6" text-anchor="end" fill="#111">${pg}</text>`;
       });
       if (i === 0) {
-        const y = PAGE_H - MB - 22;
+        const y = PAGE_H - MB - 25.4;
         s += `<text x="${ML}" y="${y}" font-size="3" font-weight="bold" fill="#2a1d12">${esc(L.how)}</text>` +
              L.howText.map((t, k) => `<text x="${ML}" y="${f2(y + 4.5 + k * 3.4)}" font-size="2.4" fill="#333">${esc(t)}</text>`).join("");
       }

@@ -33,6 +33,10 @@ For each `NAME_notes/batch_NNN.json`, read it and write `NAME_notes/patch_NNN.js
 following [rules.md](rules.md). Work one batch at a time: read it, write its patch,
 then go to the next. Skip batches that already have a patch file when resuming.
 
+Uncertain statements ("terá falecido em…", "provavelmente", "?", "(net)") are asked, not guessed:
+after each batch, ask the user about each one (see "Uncertain statements" in rules.md) and add the
+ones they confirm to that batch's patch.
+
 After each few batches, run a dry run to catch mistakes early:
 
 ```bash
@@ -54,7 +58,8 @@ The original `NAME.json` is never modified.
 - Counts printed by the script (events added, fields filled in, MARR added, notes removed).
 - Every **conflict** (note disagrees with existing data; existing data was kept).
 - A few before/after examples, including at least one marriage.
-- Notes you deliberately left untouched because they were ambiguous.
+- Notes you deliberately left untouched because they were ambiguous, and the uncertain statements
+  the user chose to leave in the note.
 
 These files contain personal family data. Keep them local: `*.json`, `*.ged` and `*.zip` are
 gitignored, so never force-add them or send them anywhere.
