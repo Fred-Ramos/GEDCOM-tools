@@ -72,8 +72,11 @@ def merge_event(where, record, tag, new, stats, conflicts):
         if field not in current:
             current[field] = value
             stats[f"{tag}.{field} filled in"] += 1
-        elif current[field].strip().lower() != value.lower():
-            conflicts.append(f"{where} {tag}.{field}: kept '{current[field]}', note says '{value}'")
+        else:
+            # A place may carry coordinates: {"_NAME": "Porto", "MAP": {...}}; compare the names.
+            have = current[field].get("_NAME", "") if isinstance(current[field], dict) else current[field]
+            if str(have).strip().lower() != value.lower():
+                conflicts.append(f"{where} {tag}.{field}: kept '{have}', note says '{value}'")
     record[tag] = ordered(current, list(EVENT_FIELDS))
 
 

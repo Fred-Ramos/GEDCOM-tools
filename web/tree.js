@@ -64,6 +64,22 @@
     return q ? `${q} ${year}` : year;
   }
 
+  // GEDCOM coordinates of an event's place (PLAC -> MAP -> LATI "N41.1496" / LONG "W8.6110"), or null.
+  function coordsOf(event) {
+    const e = first(event);
+    const place = e && typeof e === "object" ? first(e.PLAC) : null;
+    const map = place && typeof place === "object" ? first(place.MAP) : null;
+    if (!map || typeof map !== "object") return null;
+    const num = (v, neg) => {
+      const m = String(first(v) || "").trim().match(/^([NSEW])?\s*(-?\d+(?:\.\d+)?)$/i);
+      if (!m) return null;
+      const n = Number(m[2]);
+      return m[1] && m[1].toUpperCase() === neg ? -n : n;
+    };
+    const lat = num(map.LATI, "S"), lon = num(map.LONG, "W");
+    return lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180 ? null : { lat, lon };
+  }
+
   function placeOf(event) {
     const e = first(event);
     let place = e && typeof e === "object" ? first(e.PLAC) : null;
@@ -95,7 +111,9 @@
       info.set(id, {
         id, name, years, born: born ? Number(born) : null, sex: first(p.SEX), search: normalize(name),
         surname: String(n.SURN || (String(n._NAME || "").match(/\/([^/]*)\//) || [])[1] || "").trim(),
-        birth: { year: bornL, place: placeOf(p.BIRT) || placeOf(p.BAPM) },
+        // Place (and coordinates) of the birth, or of the baptism when the birth has no place.
+        birth: { year: bornL, place: placeOf(p.BIRT) || placeOf(p.BAPM),
+                 coords: placeOf(p.BIRT) ? coordsOf(p.BIRT) : coordsOf(p.BAPM) },
         death: { year: diedL, place: placeOf(p.DEAT) || placeOf(p.BURI) },
         occupation: asList(p.OCCU).map((o) => (o && typeof o === "object" ? o._NAME : o)).filter(Boolean).join(", "),
         nick: (() => { const nk = first(n.NICK); return nk && typeof nk === "object" ? nk._NAME : nk || ""; })(),

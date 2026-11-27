@@ -59,6 +59,12 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   86% if slightly too long, otherwise wrapped; birth and death get one line each when they don't fit
   together. Box heights come from the measured text, so page breaks use real heights.
   Pages are SVGs in mm: previewed in the tab and printed with the browser's Print / Save as PDF.
+  Before the index, a "Lugares de nascimento" page (when people have coordinates, see gedcom-places).
+- `web/bookmap.js` - that birthplace map: world (Equal Earth) plus up to 4 enlarged areas (places within
+  90 km of the busiest ones); circle area ~ births (birth place, else baptism); nearby circles merge;
+  labels never cover a bigger circle. Reads `info.birth.coords` from tree.js (PLAC → MAP → LATI/LONG).
+- `web/worldmap.js` - country outlines for it: Natural Earth 1:50m (public domain, world-atlas 2.0.2),
+  simplified to 0.02° and stored as delta-coded integers (1/40°). Regenerate only if the map needs it.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 
 `main.py` and `interpret.py` add `src/` to `sys.path`, so no install is needed.
@@ -101,6 +107,12 @@ JSON conventions used by `json_to_gedcom`:
 To turn the free-text notes into BIRT/BAPM/DEAT/BURI/RESI/OCCU/MARR, use the
 `gedcom-notes` skill (`.claude/skills/gedcom-notes/`). Agents without skill support can
 follow `SKILL.md` and `rules.md` in that folder directly.
+
+## Places → coordinates
+To give the places coordinates (GEDCOM `MAP`/`LATI`/`LONG`, used by the book's map), use the
+`gedcom-places` skill (`.claude/skills/gedcom-places/`). Coordinates are worked out by the agent and
+asked to the user when ambiguous, never looked up online; answers stay in `<tree>_places/coords.json`.
+Place readers must accept a PLAC that is a string or an object with `_NAME` (+ `MAP`).
 
 ## Privacy
 `.ftz`, `.json`, `.ged`, `.zip` files and `*_photos/` folders are real family data and are gitignored.

@@ -19,6 +19,8 @@
   "use strict";
 
   const T = typeof module === "object" && module.exports ? require("./tree.js") : global.FamilyTree;
+  // The birthplace map (bookmap.js + worldmap.js) is optional: without it the book has no map page.
+  const BM = typeof module === "object" && module.exports ? require("./bookmap.js") : global.FamilyBookMap;
   const { esc, normalize } = T.internals;
 
   const LABELS = {
@@ -27,6 +29,8 @@
       familyOf: "Família de",
       otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
       people: "pessoas", families: "casais",
+      map: "Lugares de nascimento", mapOne: "1 pessoa",
+      mapCount: (n, missing) => `${n} pessoas no mapa` + (missing ? ` · ${missing} com lugar sem coordenadas` : ""),
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
         "→ p. página onde está a entrada completa ou a continuação da família.",
@@ -40,6 +44,8 @@
       otherFamilies: "Other families", separated: "sep.",
       marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
       people: "people", families: "couples",
+      map: "Birthplaces", mapOne: "1 person",
+      mapCount: (n, missing) => `${n} people on the map` + (missing ? ` · ${missing} with a place but no coordinates` : ""),
       made: "Made on", noSurname: "no surname", how: "How to read", howText: [
         "Every person has one full entry, with their number in square brackets [no.].",
         "→ p. page with the full entry, or where the family continues.",
@@ -551,7 +557,21 @@
     };
 
     // Index (needs the appearances recorded while drawing the charts).
-    const indexStart = chartPages.length ? chartPages[chartPages.length - 1].no + 1 : pageNo;
+    const afterCharts = chartPages.length ? chartPages[chartPages.length - 1].no + 1 : pageNo;
+    // Birthplace map (one page before the index) when people have coordinates.
+    const mapPoints = [];
+    let mapMissing = 0;
+    for (const pid of idx.people()) {
+      const b = info(pid).birth;
+      if (b.coords) mapPoints.push({ lat: b.coords.lat, lon: b.coords.lon, place: b.place });
+      else if (b.place) mapMissing++;
+    }
+    const mapPage = BM && options.map !== false && mapPoints.length ? afterCharts : null;
+    const mapSvgs = mapPage ? [svg(BM.birthMap(mapPoints, {
+      x: ML, y: MT, w: PAGE_W - 2 * ML, h: BODY, title: L.map, missing: mapMissing,
+      labels: { births: L.mapCount, legendOne: L.mapOne },
+    }), mapPage)] : [];
+    const indexStart = mapPage ? mapPage + 1 : afterCharts;
     // In number order, which is alphabetical.
     const entries = alphabetical.filter((pid) => appearances.has(pid)).map((pid) => {
       const { p, sur, given } = nameParts(pid);
@@ -600,6 +620,7 @@
     }
     const firstSmall = charts.find((c) => c.isRoot && !c.caption);
     if (firstSmall) toc.push([L.otherFamilies, "", firstSmall.page]);
+    if (mapPage) toc.push([L.map, "", mapPage]);
     toc.push([L.index, "", indexStart]);
     const tocSvgs = [];
     for (let i = 0, page = 2; i < Math.max(toc.length, 1); i += 72, page++) {
@@ -618,7 +639,7 @@
       tocSvgs.push(svg(s, page));
     }
 
-    pages.push(...tocSvgs, ...chartSvgs, ...indexSvgs);
+    pages.push(...tocSvgs, ...chartSvgs, ...mapSvgs, ...indexSvgs);
 
     // Self-check: everyone has exactly one full entry.
     const full = [...appearances].filter(([, m]) => [...m.values()].some(Boolean)).length;
@@ -627,7 +648,7 @@
       familyPages: Object.fromEntries(famPage),     // family id -> page (for tests and checks)
       stats: {
         people: idx.people().length, families: fam.size, pages: pages.length, chartPages: chartSvgs.length,
-        indexPages: indexSvgs.length, chapters: chapterRoots.size, charts: charts.length,
+        indexPages: indexSvgs.length, mapPages: mapSvgs.length, chapters: chapterRoots.size, charts: charts.length,
         withFullEntry: full, numbered: number.size,
       },
     };

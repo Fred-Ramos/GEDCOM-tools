@@ -49,6 +49,11 @@ def ref(v):
     return v.get("_PREF") if isinstance(v, dict) else v
 
 
+def place_text(plac):
+    """The name of a place: PLAC may be a string or an object with _NAME (and MAP coordinates)."""
+    return str((plac.get("_NAME") if isinstance(plac, dict) else plac) or "")
+
+
 def squash(text):
     return " ".join(str(text or "").split())
 
@@ -168,7 +173,7 @@ class Tree:
             p = self.people[x]
             for tag in ("BIRT", "BAPM"):
                 e = first(p.get(tag))
-                if isinstance(e, dict) and self.spanish_places.search(str(e.get("PLAC", ""))):
+                if isinstance(e, dict) and self.spanish_places.search(place_text(e.get("PLAC"))):
                     return True
             return False
         return own(pid) or any(own(x) for x in self.parents(pid) if x)

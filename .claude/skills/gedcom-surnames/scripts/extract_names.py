@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-from names_lib import Tree, apply_abbreviations, clean, load_answers, load_config, name_parts, passes_on, squash, units
+from names_lib import Tree, apply_abbreviations, clean, load_answers, load_config, name_parts, passes_on, squash, units, place_text
 
 
 def setup(tree):
@@ -54,8 +54,9 @@ def setup(tree):
         for tag in ("BIRT", "BAPM"):
             e = p.get(tag)
             e = e[0] if isinstance(e, list) else e
-            if isinstance(e, dict) and e.get("PLAC") and (marker.search(e["PLAC"]) or tree.spanish_places.search(e["PLAC"])):
-                places[e["PLAC"]] += 1
+            plac = place_text(e.get("PLAC")) if isinstance(e, dict) else ""
+            if plac and (marker.search(plac) or tree.spanish_places.search(plac)):
+                places[plac] += 1
     print("3. Places that look Spanish-speaking (ask which towns/regions use Spanish naming):")
     for place, n in places.most_common():
         print(f"   {place}: {n}")
