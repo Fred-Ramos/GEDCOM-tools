@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-from names_lib import Tree, clean, load_answers, load_config, name_parts, passes_on, squash, units
+from names_lib import Tree, apply_abbreviations, clean, load_answers, load_config, name_parts, passes_on, squash, units
 
 
 def setup(tree):
@@ -90,7 +90,7 @@ def main():
 
     def surname(pid):
         if pid in answers and "surname" in answers[pid]:
-            return answers[pid]["surname"]
+            return apply_abbreviations(answers[pid]["surname"], config["abbreviations"])
         return cleaned[pid]["surname"]
 
     def label(pid):

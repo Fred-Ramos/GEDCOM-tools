@@ -186,6 +186,18 @@ def name_parts(person):
     return squash(full), str(n.get("SURN", "")), full
 
 
+def apply_abbreviations(text, abbreviations, keep_spacing=False):
+    """Replace each key of `abbreviations` (whole words, any case) by its value, in one pass so
+    replacements never chain. Works both ways: {"XY": "Xavier Yanez"} expands, {"Xavier Yanez": "XY"}
+    shortens. keep_spacing keeps line breaks (for notes); names are squashed."""
+    if abbreviations:
+        lookup = {k.lower(): v for k, v in abbreviations.items()}
+        keys = sorted(abbreviations, key=len, reverse=True)
+        pattern = r"\b(" + "|".join(re.escape(k) for k in keys) + r")\b"
+        text = re.sub(pattern, lambda m: lookup[m.group(1).lower()], str(text or ""), flags=re.IGNORECASE)
+    return text if keep_spacing else squash(text)
+
+
 def clean(person, abbreviations=None):
     """Apply the fixed cleaning rules (rules section 2). Returns a dict describing the cleaned name.
     abbreviations: {"XY": "meaning"} from the tree's config (asked to the user)."""
@@ -214,12 +226,10 @@ def clean(person, abbreviations=None):
         changes.append("married name in parentheses")
 
     def expand(s):
-        for short, long in abbreviations.items():
-            s = re.sub(rf"\b{re.escape(short)}\b", long, s)
-        return squash(s)
-    for short in abbreviations:
-        if re.search(rf"\b{re.escape(short)}\b", birth + " " + " ".join(married_parts)):
-            changes.append(f"{short} expanded")
+        return apply_abbreviations(s, abbreviations)
+    for find, replace in abbreviations.items():
+        if re.search(rf"\b{re.escape(find)}\b", birth + " " + " ".join(married_parts), re.IGNORECASE):
+            changes.append(f"{find} -> {replace}")
     birth = expand(birth)
     married = [squash(f"{birth} {expand(x)}") for x in married_parts if x]
     if squash(birth) != squash(surname) and not changes:

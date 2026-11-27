@@ -10,7 +10,8 @@ tree lives in that tree's local `config.json` (section 0), which is gitignored w
 
 ## 0. Setup: ask before changing anything
 Run `extract_names.py TREE.json --setup`. It lists, from the tree itself:
-1. **abbreviations** found in surnames (e.g. `XY`, `A.G.S.`): ask the user what each means, or to keep it as is;
+1. **abbreviations** found in surnames (e.g. `XY`, `A.G.S.`): ask the user what each means and whether to
+   write it out in full, keep it as is, or the other way round (write a long surname as the abbreviation);
 2. **multi-word surnames** that children carry unchanged from their father: ask which ones are a
    family surname that passes on whole;
 3. **places that look Spanish-speaking**: ask which towns or regions name children the Spanish way;
@@ -49,7 +50,7 @@ The birth `NAME` is always first, so the family-tree pages show it.
 
 | Found | Do | Example |
 |---|---|---|
-| an abbreviation the user explained (config) | expand it | with `XY` = `Xavier Yanez`: `Costa XY` → `Costa Xavier Yanez` |
+| an abbreviation rule from the config | replace it in names, answers and notes, all generations (works both ways; the recorded spelling is not kept as aka for this change alone) | `{"XY": "Xavier Yanez"}`: `Costa XY` → `Costa Xavier Yanez`; `{"Xavier Yanez": "XY"}` shortens instead |
 | `(X)` at the end of the surname | X is a **married** surname: remove it from the birth surname; married name = birth surname + X | `/Reis (Ramos)/` → birth `Reis`, married `Reis Ramos` |
 | whole surname is `(X)` | birth surname unknown (infer it, section 3); married name = X | `/(Dias)/` → birth `?`, married `Dias` |
 | `'X'` in the given name | X is a **nickname**: move it to `NICK` | `Alfredo 'Dito'` → given `Alfredo`, `NICK Dito` |

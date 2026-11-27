@@ -13,9 +13,10 @@ import argparse
 import collections
 import copy
 import json
+import re
 import os
 
-from names_lib import Tree, clean, load_answers, load_config, squash
+from names_lib import Tree, apply_abbreviations, clean, load_answers, load_config, squash
 from gedcom_tools.converter import collect_photos, write_outputs
 
 
@@ -60,16 +61,25 @@ def main():
             # Older generations keep their surnames as recorded: earlier answers for them are not used.
             stats["answer skipped: older generation"] += 1
             a = {}
-        surname = squash(a["surname"]) if "surname" in a else c["surname"]
+        abbreviations = config["abbreviations"]
+        # Answers go through the same abbreviation setting as the recorded names.
+        surname = apply_abbreviations(a["surname"], abbreviations) if "surname" in a else c["surname"]
         if a.get("given"):                      # the answer may also correct the given name
             c["given"] = squash(a["given"])
             c["changes"].append("given name corrected")
-        married = c["married"] + [squash(m) for m in a.get("married", [])]
+        married = c["married"] + [apply_abbreviations(m, abbreviations) for m in a.get("married", [])]
+        # The abbreviation setting also applies to the person's note (all generations).
+        note = person.get("NOTE")
+        if isinstance(note, str) and abbreviations:
+            new_note = apply_abbreviations(note, abbreviations, keep_spacing=True)
+            if new_note != note:
+                person["NOTE"] = new_note
+                stats["note: abbreviations applied"] += 1
         if not c["changes"] and "surname" not in a and not a.get("married"):
             continue
         for change in c["changes"]:
             stats[change] += 1
-        if "surname" in a and squash(a["surname"]) != c["surname"]:
+        if "surname" in a and surname != c["surname"]:
             stats["answer: surname " + ("filled in" if not c["surname"] else "changed")] += 1
         if a.get("married"):
             stats["answer: recorded name kept as married name"] += 1
@@ -87,8 +97,12 @@ def main():
         records = [name_record(c["given"], surname, "birth", c["nick"])]
         records += [name_record(c["given"], m, "married") for m in dict.fromkeys(married) if m and m != surname]
         records += [name_record(c["given"], x, "aka") for x in c["aka"]]
-        if squash(c["original"]) != squash(records[0]["_NAME"]):
-            records.append({"_NAME": c["original"], "TYPE": "aka"})
+        # The recorded spelling is kept as aka, except for what the abbreviation setting changed.
+        original = apply_abbreviations(c["original"], abbreviations)
+        if original != squash(records[0]["_NAME"]) and re.search(r"\w", original):
+            records.append({"_NAME": original, "TYPE": "aka"})
+        if len(records) == 1:
+            records[0].pop("TYPE", None)    # a single name needs no type
         person["NAME"] = records[0] if len(records) == 1 else records
         stats["people changed"] += 1
 
