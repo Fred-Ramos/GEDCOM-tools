@@ -605,13 +605,28 @@ function setBookTree(tree, label) {
   book.dirty = true;
   if (!$("panel-book").hidden) buildBook();
 }
+// The map's reference detail (mapdetail.js, ~2.8 MB) is loaded only for a tree with coordinates.
+let mapDetailLoading = null;
+function loadMapDetail(tree) {
+  if (window.MapDetail || !JSON.stringify(tree.INDI || []).includes('"MAP"')) return Promise.resolve();
+  if (!mapDetailLoading) {
+    mapDetailLoading = new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "mapdetail.js";
+      script.onload = script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+  return mapDetailLoading;
+}
 function buildBook(note = "") {
   if (!book.tree) return;
   const lang = $("book-lang").value;
   $("book-title").placeholder = FamilyBook.LABELS[lang].title;
   setStatus("Building the book…");
   // Let the status bar paint before the (short) build.
-  setTimeout(() => {
+  setTimeout(async () => {
+    await loadMapDetail(book.tree);     // without it the map is drawn with less detail
     const photoFor = (id) => {
       const path = book.photoPaths.get(id);
       return path ? photoStore.get(path) || photoStore.get(path.split(/[\\/]/).pop()) || null : null;

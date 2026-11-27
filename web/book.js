@@ -29,7 +29,7 @@
       familyOf: "Família de",
       otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
       people: "pessoas", families: "casais",
-      map: "Lugares de nascimento", mapOne: "1 pessoa",
+      map: "Lugares de nascimento", mapLess: "Menos", mapMore: "Mais nascimentos",
       mapCount: (n, missing) => `${n} pessoas no mapa` + (missing ? ` · ${missing} com lugar sem coordenadas` : ""),
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
@@ -44,7 +44,7 @@
       otherFamilies: "Other families", separated: "sep.",
       marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
       people: "people", families: "couples",
-      map: "Birthplaces", mapOne: "1 person",
+      map: "Birthplaces", mapLess: "Fewer", mapMore: "More births",
       mapCount: (n, missing) => `${n} people on the map` + (missing ? ` · ${missing} with a place but no coordinates` : ""),
       made: "Made on", noSurname: "no surname", how: "How to read", howText: [
         "Every person has one full entry, with their number in square brackets [no.].",
@@ -569,7 +569,7 @@
     const mapPage = BM && options.map !== false && mapPoints.length ? afterCharts : null;
     const mapSvgs = mapPage ? [svg(BM.birthMap(mapPoints, {
       x: ML, y: MT, w: PAGE_W - 2 * ML, h: BODY, title: L.map, missing: mapMissing,
-      labels: { births: L.mapCount, legendOne: L.mapOne },
+      labels: { births: L.mapCount, less: L.mapLess, more: L.mapMore },
     }), mapPage)] : [];
     const indexStart = mapPage ? mapPage + 1 : afterCharts;
     // In number order, which is alphabetical.

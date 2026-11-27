@@ -60,11 +60,17 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   together. Box heights come from the measured text, so page breaks use real heights.
   Pages are SVGs in mm: previewed in the tab and printed with the browser's Print / Save as PDF.
   Before the index, a "Lugares de nascimento" page (when people have coordinates, see gedcom-places).
-- `web/bookmap.js` - that birthplace map: world (Equal Earth) plus up to 4 enlarged areas (places within
-  90 km of the busiest ones); circle area ~ births (birth place, else baptism); nearby circles merge;
-  labels never cover a bigger circle. Reads `info.birth.coords` from tree.js (PLAC → MAP → LATI/LONG).
-- `web/worldmap.js` - country outlines for it: Natural Earth 1:50m (public domain, world-atlas 2.0.2),
-  simplified to 0.02° and stored as delta-coded integers (1/40°). Regenerate only if the map needs it.
+- `web/bookmap.js` - that birthplace map: a colour density (heat) layer, pale yellow to dark red, made with
+  an SVG filter (blurred discs, alpha mapped to a colour ramp); the family's places are never named.
+  World (Equal Earth) plus up to 4 enlarged areas (places within 90 km of the busiest ones), each named
+  after its main reference city and drawn with reference detail. Births = birth place, else baptism;
+  reads `info.birth.coords` from tree.js (PLAC → MAP → LATI/LONG).
+- `web/worldmap.js` - country outlines for the world map: Natural Earth 1:50m (public domain, world-atlas
+  2.0.2), simplified to 0.02°, delta-coded integers (1/40°). Loaded with the page.
+- `web/mapdetail.js` - reference detail for the enlarged areas, Natural Earth 1:10m: land, country borders,
+  admin-1 (district/state) borders, rivers, lakes, major and secondary roads, populated places (name +
+  rank). ~2.8 MB, so the page loads it only when a book with coordinates is built. Inset geometry far
+  outside a frame is pulled onto its margin, so a page stays ~200 KB. Regenerate only if the map needs it.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 
 `main.py` and `interpret.py` add `src/` to `sys.path`, so no install is needed.
