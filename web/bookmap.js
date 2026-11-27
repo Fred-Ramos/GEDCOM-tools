@@ -6,13 +6,52 @@
 // (heat) layer: pale yellow where few people were born, through orange to dark red where many were.
 // The family's places are not named. The world map (Equal Earth) shows the whole spread; the busiest
 // areas (places within 90 km of the busiest ones) get enlarged insets below, up to four, drawn with
-// reference detail and named after their main reference city.
+// reference detail (Natural Earth) and town names (GeoNames), named after their main town.
 (function (global) {
   "use strict";
 
   const node = typeof module === "object" && module.exports;
   const W = node ? require("./worldmap.js") : global.WorldMap;
   const detail = () => (node ? (() => { try { return require("./mapdetail.js"); } catch (e) { return null; } })() : global.MapDetail);
+
+  // Towns (GeoNames, 1,000+ inhabitants): towns/index.js says which countries have towns in each
+  // 2-degree cell; towns/<CC>.js holds one country. The page loads the files it needs before
+  // building (see townCountries); in Node they are read here.
+  const townIndex = () => (node ? (() => { try { return require("./towns/index.js"); } catch (e) { return null; } })() : global.MapTownsIndex);
+  const townFile = (cc) => (node ? (() => { try { return require(`./towns/${cc}.js`); } catch (e) { return null; } })()
+                                 : (global.MapTowns || {})[cc] || null);
+  const cellSets = new Map();
+  /** Countries with towns inside any of the boxes [lonMin, latMin, lonMax, latMax]. */
+  function townCountries(boxes) {
+    const index = townIndex();
+    if (!index) return [];
+    const ids = new Set();
+    for (const [a, b, c, d] of boxes) {
+      for (let la = Math.floor(b / 2); la <= Math.floor(d / 2); la++) {
+        for (let lo = Math.floor(a / 2); lo <= Math.floor(c / 2); lo++) ids.add((la + 45) * 180 + lo + 90);
+      }
+    }
+    return Object.keys(index).filter((cc) => {
+      if (!cellSets.has(cc)) cellSets.set(cc, new Set(index[cc]));
+      const set = cellSets.get(cc);
+      return [...ids].some((id) => set.has(id));
+    });
+  }
+  /** Towns inside a box as {name, lat, lon, rank}, most important first; null when none are loaded. */
+  function townsIn(box) {
+    const out = [];
+    let loaded = false;
+    for (const cc of townCountries([box])) {
+      const list = townFile(cc);
+      if (!list) continue;
+      loaded = true;
+      for (const [name, la, lo, rank] of list) {
+        const lat = la / 100, lon = lo / 100;
+        if (lon >= box[0] && lon <= box[2] && lat >= box[1] && lat <= box[3]) out.push({ name, lat, lon, rank });
+      }
+    }
+    return loaded ? out.sort((p, q) => p.rank - q.rank) : null;
+  }
 
   const f2 = (v) => Math.round(v * 100) / 100;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -122,10 +161,8 @@
    * points: [{lat, lon}] one per person. opts: {x, y, w, h (mm), title, missing (people with a place
    * but no coordinates), labels: {births(n, missing), less, more}}. Returns SVG content (no <svg>).
    */
-  function birthMap(points, opts) {
+  function layout(points, opts) {
     const { x: X, y: Y, w: Wd } = opts;
-    const L = opts.labels;
-    const MD = detail();
     // Same coordinates = one place.
     const byCoord = new Map();
     for (const p of points) {
@@ -179,6 +216,17 @@
       const centre = { lat: inside.reduce((t, g) => t + g.lat * g.n, 0) / n, lon: inside.reduce((t, g) => t + g.lon * g.n, 0) / n };
       return { i, fx, fy, proj, box, inside, people: n, centre, frame: [fx, fy + 6, cellW, innerH] };
     });
+    return { groups, world, top, worldH, views };
+  }
+
+  /** The boxes of the enlarged areas, so the page can load their town files before building. */
+  const insetBoxes = (points, opts) => layout(points, opts).views.map((v) => v.box);
+
+  function birthMap(points, opts) {
+    const { x: X, y: Y, w: Wd } = opts;
+    const L = opts.labels;
+    const MD = detail();
+    const { groups, world, top, worldH, views } = layout(points, opts);
 
     let s = `<text x="${X}" y="${Y + 2}" font-size="5" font-weight="bold" fill="#2a1d12">${esc(opts.title)}</text>`;
     s += `<defs><clipPath id="bm-world"><rect x="${X}" y="${top}" width="${f2(Wd)}" height="${f2(worldH)}"/></clipPath>` +
@@ -218,13 +266,17 @@
     const land = MD && MD.land ? decode("land", MD.land, MD.scale) : countryRings();
     const borders = MD && MD.borders ? decode("borders", MD.borders, MD.scale) : null;
     const cities = MD ? MD.cities.map(([name, lat, lon, rank]) => ({ name, lat: lat / MD.scale, lon: lon / MD.scale, rank })) : [];
+    const regions = MD && MD.regions ? MD.regions.map(([name, pt, lat, lon, rank]) =>
+      ({ name: opts.lang === "pt" && pt ? pt : name, lat: lat / MD.scale, lon: lon / MD.scale, rank })) : [];
     for (const v of views) {
       const [fx, fy, fw, fh] = v.frame;
-      const inFrame = cities.filter((c) => c.lon >= v.box[0] && c.lon <= v.box[2] && c.lat >= v.box[1] && c.lat <= v.box[3]);
-      // Named after the most important reference city, closest to the births' centre on a tie.
-      const main = inFrame.slice().sort((a, b) => a.rank - b.rank || km(a, v.centre) - km(b, v.centre))[0];
+      const inBox = (c) => c.lon >= v.box[0] && c.lon <= v.box[2] && c.lat >= v.box[1] && c.lat <= v.box[3];
+      // Reference places: GeoNames towns when their files are loaded, else Natural Earth's cities.
+      const towns = townsIn(v.box) || cities.filter(inBox);
+      // Named after the most important reference place (bigger first on a tie).
+      const main = towns[0];
       s += `<text x="${f2(v.fx)}" y="${f2(v.fy + 4)}" font-size="2.8" font-weight="bold" fill="#2a1d12">${v.i + 1}${main ? ` · ${esc(main.name)}` : ""}` +
-           `<tspan font-weight="normal" fill="#666"> (${v.people})</tspan></text>`;
+           `<tspan font-weight="normal" fill="#666">\u00a0(${v.people})</tspan></text>`;
       s += `<rect x="${f2(fx)}" y="${f2(fy)}" width="${f2(fw)}" height="${f2(fh)}" fill="${SEA}" stroke="#9aa7ad" stroke-width="0.25"/>`;
       s += `<g clip-path="url(#bm-inset-${v.i})">` +
            el(path(land, v.proj, v.box, true, v.frame), `fill="${LAND}" stroke="${BORDER}" stroke-width="0.12"`) +
@@ -236,28 +288,52 @@
            (borders ? el(path(borders, v.proj, v.box, false, v.frame), `fill="none" stroke="${BORDER}" stroke-width="0.35"`)
                     : el(path(countryRings(), v.proj, v.box, true, v.frame), `fill="none" stroke="${BORDER}" stroke-width="0.35"`));
       s += heat(`bm-heat-${v.i}`, v.inside, v.proj, v.frame, 2.2);
-      // Reference cities: most important first, skipped where a label would overlap another.
+
+      // Labels never overlap each other or a town's dot. First up to three region names (districts,
+      // states, provinces), faint and spaced out; then the towns, most important first.
       const taken = [];
-      let shown = 0;
-      for (const c of inFrame) {
-        if (shown >= 16) break;
-        const [cx, cy] = v.proj(c.lon, c.lat);
-        const size = c.rank <= 3 ? 2.5 : c.rank <= 6 ? 2.2 : 2.0;
-        const tw = c.name.length * size * 0.5;
-        const b = [cx - 0.6, cy - size, cx + 1.2 + tw, cy + 0.8];
-        if (b[2] > fx + fw - 0.5 || b[0] < fx || b[1] < fy || b[3] > fy + fh) continue;
-        if (taken.some((t) => b[0] < t[2] && b[2] > t[0] && b[1] < t[3] && b[3] > t[1])) continue;
+      const free = (b) => b[0] >= fx + 0.3 && b[2] <= fx + fw - 0.3 && b[1] >= fy + 0.3 && b[3] <= fy + fh - 0.3 &&
+                          !taken.some((t) => b[0] < t[2] && b[2] > t[0] && b[1] < t[3] && b[3] > t[1]);
+      let regionSvg = "", regionsShown = 0;
+      for (const rg of regions.filter(inBox).sort((p, q) => p.rank - q.rank)) {
+        if (regionsShown >= 3) break;
+        const [cx, cy] = v.proj(rg.lon, rg.lat);
+        const text = rg.name.toUpperCase(), size = 2.5, spacing = 0.6;
+        const tw = text.length * (size * 0.66 + spacing);
+        const b = [cx - tw / 2, cy - size * 0.8, cx + tw / 2, cy + size * 0.2];
+        if (!free(b)) continue;
         taken.push(b);
-        s += `<circle cx="${f2(cx)}" cy="${f2(cy)}" r="${c.rank <= 3 ? 0.65 : 0.45}" fill="#fff" stroke="${CITY}" stroke-width="0.25"/>` +
-             `<text x="${f2(cx + 1)}" y="${f2(cy + 0.75)}" font-size="${size}"${c.rank <= 3 ? ' font-weight="bold"' : ""} fill="${CITY}" stroke="#fff" stroke-width="0.45" paint-order="stroke">${esc(c.name)}</text>`;
+        regionsShown++;
+        regionSvg += `<text x="${f2(cx)}" y="${f2(cy)}" font-size="${size}" text-anchor="middle" letter-spacing="${spacing}"` +
+                     ` fill="#8f846f" fill-opacity="0.8">${esc(text)}</text>`;
+      }
+      let townSvg = "", shown = 0;
+      for (const c of towns) {
+        if (shown >= 45) break;
+        const [cx, cy] = v.proj(c.lon, c.lat);
+        const big = c.rank <= 4, mid = c.rank <= 8;
+        const size = big ? 2.5 : mid ? 2.1 : 1.75, r = big ? 0.65 : mid ? 0.45 : 0.32;
+        const tw = c.name.length * size * (big ? 0.6 : 0.52);
+        const dot = [cx - r, cy - r, cx + r, cy + r];
+        const right = [cx - r, cy - size * 0.75, cx + r + 0.5 + tw, cy + size * 0.3];
+        const left = [cx - r - 0.5 - tw, cy - size * 0.75, cx + r, cy + size * 0.3];
+        const side = free(right) ? "right" : free(left) ? "left" : null;
+        if (!side) continue;
+        taken.push(side === "right" ? right : left, dot);
+        const tx = side === "right" ? cx + r + 0.4 : cx - r - 0.4;
+        townSvg += `<circle cx="${f2(cx)}" cy="${f2(cy)}" r="${r}" fill="#fff" stroke="${CITY}" stroke-width="${big ? 0.3 : 0.22}"/>` +
+                   `<text x="${f2(tx)}" y="${f2(cy + size * 0.3)}" font-size="${size}"${big ? ' font-weight="bold"' : ""}` +
+                   `${side === "left" ? ' text-anchor="end"' : ""} fill="${mid ? CITY : "#555"}" stroke="#fff" stroke-width="0.4" paint-order="stroke">${esc(c.name)}</text>`;
         shown++;
       }
-      s += `</g>`;
+      s += regionSvg + townSvg + `</g>`;
     }
+    // Credits for the map data.
+    s += `<text x="${f2(X + Wd)}" y="${f2(opts.y + opts.h + 1)}" font-size="1.9" text-anchor="end" fill="#888">${esc(L.credit)}</text>`;
     return s;
   }
 
-  const api = { birthMap, equalEarth };
+  const api = { birthMap, insetBoxes, townCountries, equalEarth };
   if (node) module.exports = api;
   else global.FamilyBookMap = api;
 })(typeof window !== "undefined" ? window : globalThis);

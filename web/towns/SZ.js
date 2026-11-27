@@ -1,0 +1,5 @@
+// Towns of SZ (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Mbabane",-2632,3113,2],["Manzini",-2650,3138,5],["Siteki",-2645,3195,5],["Piggs Peak",-2596,3125,5],["Nhlangano",-2711,3120,5],["Ntfonjeni",-2583,3133,8],["Malkerns",-2653,3119,8],["Mhlume",-2603,3181,8],["Hluti",-2722,3159,9],["Big Bend",-2679,3194,9],["Lobamba",-2647,3120,9],["Vuvulane",-2607,3188,9],["Kwaluseni",-2648,3133,9],["Bhunya",-2654,3101,10],["Mhlambanyatsi",-2645,3105,10],["Hlathikhulu",-2698,3133,10],["Ezulwini",-2640,3117,10],["Bulembu",-2595,3113,10],["Kubuta",-2688,3148,10],["Lavumisa",-2731,3189,10],["Thunzini",-2596,3173,10],["Sidvokodvo",-2663,3142,10],["Darkton",-2623,3103,11],["Nsoko",-2703,3194,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["SZ"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

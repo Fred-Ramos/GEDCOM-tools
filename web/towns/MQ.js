@@ -1,0 +1,5 @@
+// Towns of MQ (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Fort-de-France",1460,-6107,2],["Le Lamentin",1461,-6100,6],["Le Robert",1468,-6094,7],["Sainte-Marie",1478,-6099,7],["Le François",1462,-6090,7],["Ducos",1458,-6097,7],["Saint-Joseph",1467,-6104,7],["La Trinité",1474,-6096,7],["Rivière-Pilote",1449,-6090,8],["Le Gros-Morne",1470,-6100,8],["Sainte-Luce",1447,-6092,8],["Saint-Esprit",1455,-6093,8],["Le Lorrain",1483,-6106,8],["Le Marin",1447,-6087,8],["Le Vauclin",1455,-6084,8],["Les Trois-Îlets",1454,-6103,9],["Le Morne-Rouge",1478,-6114,9],["Sainte-Anne",1443,-6088,9],["Saint-Pierre",1474,-6118,9],["Basse-Pointe",1487,-6112,9],["L'Ajoupa-Bouillon",1482,-6112,10]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["MQ"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

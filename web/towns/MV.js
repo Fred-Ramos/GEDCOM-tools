@@ -1,0 +1,5 @@
+// Towns of MV (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Male",418,7351,2],["Hithadhoo",-60,7308,5],["Mahibadhoo",376,7297,5],["Eydhafushi",510,7307,5],["Kudahuvadhoo",267,7289,5],["Viligili",76,7343,5],["Thinadhoo",53,7300,5],["Fuvahmulah",-30,7342,5],["Dhihdhoo",689,7311,5],["Kulhudhuffushi",662,7307,5],["Naifaru",544,7337,5],["Muli",292,7358,5],["Manadhoo",577,7341,5],["Un’goofaaru",567,7303,5],["Funadhoo",615,7329,5],["Veymandoo",219,7310,5],["Felidhoo",347,7355,5],["Fonadhoo",183,7350,5],["Nilandhoo",306,7289,5],["Gadhdhoo",29,7346,8],["Hulhumale",421,7354,9],["Maafushi",394,7349,10],["Vilufushi",250,7331,10],["Thulusdhoo",437,7365,10],["Guraidhoo",232,7332,10],["Guraidhoo",390,7347,10],["Meedhoo",-58,7323,10],["Vaadhoo",23,7327,10],["Open Stage",511,7307,11],["Madifushi",236,7335,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["MV"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

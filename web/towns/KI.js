@@ -1,0 +1,5 @@
+// Towns of KI (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Tarawa",133,17298,2],["Betio Village",136,17292,8],["Bikenibeu Village",137,17312,9],["Teaoraereke Village",133,17301,9],["Bairiki Village",133,17298,10],["Eita Village",136,17308,10],["Bonriki Village",138,17314,10],["Temaiku Village",136,17316,10],["Tabwakea Village",202,-15749,10],["Makin Village",336,17298,10],["London Village",198,-15748,10],["Banraeaba Village",135,17303,10],["Nawerewere Village",136,17314,10],["Ambo Village",135,17304,10],["Buota Village",139,17313,11],["Banana",197,-15739,11],["Banana Village",198,-15737,11],["Rawannawi Village",205,17326,11],["Napari Village",391,-15939,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["KI"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

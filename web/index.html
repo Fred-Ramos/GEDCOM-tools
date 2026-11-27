@@ -605,19 +605,27 @@ function setBookTree(tree, label) {
   book.dirty = true;
   if (!$("panel-book").hidden) buildBook();
 }
-// The map's reference detail (mapdetail.js, ~2.8 MB) is loaded only for a tree with coordinates.
-let mapDetailLoading = null;
-function loadMapDetail(tree) {
-  if (window.MapDetail || !JSON.stringify(tree.INDI || []).includes('"MAP"')) return Promise.resolve();
-  if (!mapDetailLoading) {
-    mapDetailLoading = new Promise((resolve) => {
+// The map's reference detail (mapdetail.js, ~3 MB) and its towns (towns/index.js, then one file per
+// country the enlarged areas show) are loaded only for a tree with coordinates, once each.
+const scriptsLoading = new Map();
+function loadScript(src) {
+  if (!scriptsLoading.has(src)) {
+    scriptsLoading.set(src, new Promise((resolve) => {
       const script = document.createElement("script");
-      script.src = "mapdetail.js";
-      script.onload = script.onerror = () => resolve();
+      script.src = src;
+      script.onload = script.onerror = () => resolve();   // a missing file only means less detail
       document.head.appendChild(script);
-    });
+    }));
   }
-  return mapDetailLoading;
+  return scriptsLoading.get(src);
+}
+async function loadMapDetail(tree) {
+  if (!JSON.stringify(tree.INDI || []).includes('"MAP"')) return;
+  await Promise.all([window.MapDetail ? null : loadScript("mapdetail.js"),
+                     window.MapTownsIndex ? null : loadScript("towns/index.js")]);
+  const countries = FamilyBook.mapTownCountries(tree);
+  await Promise.all(countries.filter((cc) => !(window.MapTowns && window.MapTowns[cc]))
+                             .map((cc) => loadScript(`towns/${cc}.js`)));
 }
 function buildBook(note = "") {
   if (!book.tree) return;

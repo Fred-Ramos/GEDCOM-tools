@@ -63,13 +63,18 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
 - `web/bookmap.js` - that birthplace map: a colour density (heat) layer, pale yellow to dark red, made with
   an SVG filter (blurred discs, alpha mapped to a colour ramp); the family's places are never named.
   World (Equal Earth) plus up to 4 enlarged areas (places within 90 km of the busiest ones), each named
-  after its main reference city and drawn with reference detail. Births = birth place, else baptism;
-  reads `info.birth.coords` from tree.js (PLAC → MAP → LATI/LONG).
+  after its main town and drawn with reference detail: up to 3 region names, then up to 45 towns (most
+  important first, labels never overlap). Births = birth place, else baptism; reads `info.birth.coords`
+  from tree.js (PLAC → MAP → LATI/LONG). A credit line names the data (Natural Earth, GeoNames CC BY 4.0).
 - `web/worldmap.js` - country outlines for the world map: Natural Earth 1:50m (public domain, world-atlas
   2.0.2), simplified to 0.02°, delta-coded integers (1/40°). Loaded with the page.
 - `web/mapdetail.js` - reference detail for the enlarged areas, Natural Earth 1:10m: land, country borders,
   admin-1 (district/state) borders, rivers, lakes, major and secondary roads, populated places (name +
-  rank). ~2.8 MB, so the page loads it only when a book with coordinates is built. Inset geometry far
+  rank, fallback when towns are missing) and admin-1 region names with Portuguese names. ~3 MB, so the
+  page loads it only when a book with coordinates is built.
+- `web/towns/` - GeoNames towns of 1,000+ inhabitants (CC BY 4.0), one file per country (`PT.js`, …:
+  name, lat, lon, rank by population, seats count as bigger) and `index.js` (countries per 2° cell).
+  `FamilyBook.mapTownCountries(tree)` says which countries the insets need; the page loads only those. Inset geometry far
   outside a frame is pulled onto its margin, so a page stays ~200 KB. Regenerate only if the map needs it.
 - `interpret.py` + `prompt.txt` - older OpenRouter/DeepSeek note interpreter.
 

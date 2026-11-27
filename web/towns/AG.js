@@ -1,0 +1,5 @@
+// Towns of AG (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Saint John’s",1712,-6184,2],["Piggotts",1712,-6180,5],["Parham",1710,-6177,5],["Freetown",1705,-6170,5],["Falmouth",1703,-6178,5],["Codrington",1764,-6182,5],["Bolands",1707,-6187,5],["St. Paul Parish",1702,-6177,5],["St. George Parish",1712,-6180,8],["St. Mary Parish",1707,-6187,8],["St. Peter Parish",1708,-6171,9],["St. Philip Parish",1705,-6173,9],["Liberta",1704,-6179,10],["All Saints",1707,-6179,10],["Swetes",1705,-6180,10],["Barbuda Parish",1762,-6178,10],["Potters Village",1711,-6182,11],["Willikies",1709,-6171,11],["New Winthorpes",1715,-6181,11],["Jacks Hill",1711,-6186,11],["Sugar Factory",1709,-6182,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["AG"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

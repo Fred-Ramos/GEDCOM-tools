@@ -1,0 +1,5 @@
+// Towns of LR (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Monrovia",630,-1080,1],["Zwedru",607,-814,5],["Voinjama",842,-975,5],["Tubmanburg",687,-1082,5],["Fish Town",520,-788,5],["Sanniquellie",736,-871,5],["Robertsport",675,-1137,5],["River Cess",546,-958,5],["Kakata",653,-1035,5],["Harper",438,-771,5],["Greenville",501,-904,5],["Gbarnga",700,-947,5],["Buchanan",588,-1005,5],["Bopolu",707,-1049,5],["Bensonville",645,-1061,5],["Barclayville",467,-823,5],["Ganta",724,-898,6],["Harbel",625,-1036,6],["Pleebo City",459,-767,6],["Foya Kamara",836,-1021,7],["New Yekepa",758,-854,7],["Saclepea",696,-884,7],["Ganta",730,-853,8],["Buutuo",683,-834,8],["Karnplay",727,-850,8],["Zorzor",778,-943,8],["River Gbeh",521,-767,8]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["LR"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

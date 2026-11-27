@@ -1,0 +1,5 @@
+// Towns of DJ (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Djibouti",1159,4315,2],["Balbala",1156,4311,3],["Tadjoura",1179,4288,5],["Obock",1197,4329,5],["Dikhil",1110,4237,5],["Arta",1153,4285,5],["Ali Sabih",1116,4271,5],["‘As ‘Êla",1100,4210,9],["Damêrdjôg",1149,4319,9],["Médého",1197,4303,9],["Ouê‘a",1150,4286,9],["Holhol",1131,4293,9],["‘Ali ‘Addé",1113,4289,9],["Khôr Angar",1239,4333,9],["Waddi",1235,4293,9],["Yoboki",1151,4211,10],["Randa",1185,4266,10],["Dorra",1215,4248,10],["Gâlâfi",1172,4184,10],["Dasbiyo",1125,4280,10],["Loyada",1146,4325,10],["Egahlou",1212,4294,10],["Alaïli Ḏaḏḏa‘",1242,4290,11],["Goubétto",1142,4300,11],["Koûta Boûyya",1102,4196,11],["Airolaf",1177,4265,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["DJ"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

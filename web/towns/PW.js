@@ -1,0 +1,5 @@
+// Towns of PW (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Ngerulmud",750,13462,2],["Koror",734,13447,5],["Ulimang",762,13464,5],["Melekeok Village",750,13464,5],["Ngereklmadel",749,13449,5],["Imeong Hamlet",753,13453,5],["Ngchesar Hamlet",747,13461,5],["Ngerkeai",755,13464,5],["Mengellang",770,13463,5],["Angaur State",691,13413,5],["Tobi Village",300,13112,5],["Sonsorol Village",533,13222,5],["Kayangel",808,13472,5],["Kloulklubed",704,13426,5],["Ngetkib",736,13451,5],["Ngchemiangel",745,13448,5],["Ngardmau",761,13457,5],["Koror Town",734,13448,8],["Ngerbeched Hamlet",733,13448,11],["Ngerchemai Hamlet",735,13449,11],["Ngermid Hamlet",734,13450,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["PW"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

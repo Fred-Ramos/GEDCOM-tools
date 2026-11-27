@@ -1,0 +1,5 @@
+// Towns of KW (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Kuwait City",2937,4797,2],["Al Aḩmadī",2908,4808,3],["Ḩawallī",2933,4803,4],["Şabāḩ as Sālim",2926,4806,5],["Al Jahrā’",2934,4766,5],["Al Farwānīyah",2928,4796,5],["Mubārak al Kabīr",2919,4809,5],["Al Faḩāḩīl",2908,4813,5],["Ar Riqqah",2915,4809,6],["Al Manqaf",2910,4813,6],["Al Finţās",2917,4812,7],["Janūb as Surrah",2927,4798,7],["Al Mahbūlah",2914,4813,7],["Ad Dasmah",2936,4800,7],["Al Wafrah",2864,4793,8],["Mazāri‘ al ‘Abdalī",3004,4772,8],["Az Zawr",2944,4827,9],["Al-Masayel",2924,4809,10],["Al Funayţīs",2923,4810,10],["Abu Al Hasaniya",2919,4811,11],["Abu Fatira",2920,4810,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["KW"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

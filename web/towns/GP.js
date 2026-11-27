@@ -1,0 +1,5 @@
+// Towns of GP (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Basse-Terre",1600,-6173,2],["Les Abymes",1627,-6151,6],["Baie-Mahault",1627,-6159,7],["Le Gosier",1621,-6149,7],["Petit-Bourg",1619,-6159,7],["Sainte-Anne",1623,-6138,7],["Le Moule",1633,-6135,7],["Sainte-Rose",1633,-6170,7],["Capesterre-Belle-Eau",1604,-6156,7],["Pointe-à-Pitre",1624,-6153,7],["Lamentin",1627,-6163,7],["Saint-François",1625,-6127,8],["Saint-Claude",1603,-6170,8],["Trois-Rivières",1598,-6164,8],["Gourbeyre",1599,-6169,8],["Petit-Canal",1638,-6149,8],["Pointe-Noire",1623,-6179,8],["Vieux-Habitants",1606,-6177,8],["Grand-Bourg",1588,-6131,9],["Baillif",1602,-6175,9],["Port-Louis",1642,-6153,9],["Anse-Bertrand",1647,-6151,9],["Deshaies",1631,-6179,9],["Beauséjour",1630,-6107,10],["Petites Anses",1585,-6164,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["GP"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

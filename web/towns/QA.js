@@ -1,0 +1,5 @@
+// Towns of QA (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Doha",2529,5153,2],["Ar Rayyān",2529,5142,4],["Lusail",2542,5151,4],["Umm Şalāl ‘Alī",2547,5140,5],["Madīnat ash Shamāl",2613,5120,5],["Az̧ Z̧a‘āyin",2558,5148,5],["Ash Shīḩānīyah",2537,5122,5],["Al Wakrah",2517,5160,5],["Al Khawr",2568,5151,5],["Umm Ghuwaylīnah",2559,5115,6],["Umm Şalāl Muḩammad",2542,5141,7],["Mu‘aydhir Rawḑat Rāshid",2526,5140,7],["Nu‘ayjah",2525,5153,7],["Dukhān",2542,5078,8],["Musay‘īd",2499,5155,9],["Al Wukayr",2515,5154,9],["Ar Ruways",2614,5121,9],["Umm Bāb",2521,5081,10],["Al Ghuwayrīyah",2583,5125,10],["Al Jumaylīyah",2561,5109,10],["Fuwayriţ",2603,5137,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["QA"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

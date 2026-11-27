@@ -30,6 +30,7 @@
       otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
       people: "pessoas", families: "casais",
       map: "Lugares de nascimento", mapLess: "Menos", mapMore: "Mais nascimentos",
+      mapCredit: "Dados do mapa: Natural Earth · GeoNames (CC BY 4.0)",
       mapCount: (n, missing) => `${n} pessoas no mapa` + (missing ? ` · ${missing} com lugar sem coordenadas` : ""),
       made: "Gerado em", noSurname: "sem apelido", how: "Como ler", howText: [
         "Cada pessoa tem uma entrada completa, com o número entre parênteses rectos [n.º].",
@@ -45,6 +46,7 @@
       marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
       people: "people", families: "couples",
       map: "Birthplaces", mapLess: "Fewer", mapMore: "More births",
+      mapCredit: "Map data: Natural Earth · GeoNames (CC BY 4.0)",
       mapCount: (n, missing) => `${n} people on the map` + (missing ? ` · ${missing} with a place but no coordinates` : ""),
       made: "Made on", noSurname: "no surname", how: "How to read", howText: [
         "Every person has one full entry, with their number in square brackets [no.].",
@@ -63,7 +65,8 @@
   const LH = 3.0, PAD = 1.5, GAP = 1.6, TREE_GAP = 7, CAPTION = 7;
   const FONT = 2.3, FONT_NAME = 2.45, FONT_SMALL = 1.9;
   const LEVELS = ["compact", "standard", "detailed"];
-  const MIN_SCALE = 0.86;                     // a line may shrink this much before it wraps instead
+  const MIN_SCALE = 0.86;
+  const MAP_BOX = { x: ML, y: MT, w: PAGE_W - 2 * ML, h: BODY };   // the birthplace map page                     // a line may shrink this much before it wraps instead
   // Lines the gedcom-surnames skill adds to a note to mark a worked-out surname: not printed.
   const DEDUCED_SURNAME = /^\s*Apelido deduzido \(não registado\)/i;
   const IDX_LH = 3.1, IDX_NOTE = 1.85, IDX_NOTE_LH = 2.45, IDX_INDENT = 2.5;
@@ -559,17 +562,11 @@
     // Index (needs the appearances recorded while drawing the charts).
     const afterCharts = chartPages.length ? chartPages[chartPages.length - 1].no + 1 : pageNo;
     // Birthplace map (one page before the index) when people have coordinates.
-    const mapPoints = [];
-    let mapMissing = 0;
-    for (const pid of idx.people()) {
-      const b = info(pid).birth;
-      if (b.coords) mapPoints.push({ lat: b.coords.lat, lon: b.coords.lon, place: b.place });
-      else if (b.place) mapMissing++;
-    }
+    const { points: mapPoints, missing: mapMissing } = birthPoints(idx);
     const mapPage = BM && options.map !== false && mapPoints.length ? afterCharts : null;
     const mapSvgs = mapPage ? [svg(BM.birthMap(mapPoints, {
-      x: ML, y: MT, w: PAGE_W - 2 * ML, h: BODY, title: L.map, missing: mapMissing,
-      labels: { births: L.mapCount, less: L.mapLess, more: L.mapMore },
+      ...MAP_BOX, title: L.map, missing: mapMissing, lang,
+      labels: { births: L.mapCount, less: L.mapLess, more: L.mapMore, credit: L.mapCredit },
     }), mapPage)] : [];
     const indexStart = mapPage ? mapPage + 1 : afterCharts;
     // In number order, which is alphabetical.
@@ -654,7 +651,26 @@
     };
   }
 
-  const api = { buildBook, LABELS };
+  // Birth (else baptism) places with coordinates, one per person, and how many places have none.
+  function birthPoints(idx) {
+    const points = [];
+    let missing = 0;
+    for (const pid of idx.people()) {
+      const b = idx.info(pid).birth;
+      if (b.coords) points.push({ lat: b.coords.lat, lon: b.coords.lon });
+      else if (b.place) missing++;
+    }
+    return { points, missing };
+  }
+
+  /** Countries whose town files (web/towns/<CC>.js) the map of this tree needs; [] without a map. */
+  function mapTownCountries(tree) {
+    if (!BM) return [];
+    const { points } = birthPoints(T.indexTree(tree));
+    return points.length ? BM.townCountries(BM.insetBoxes(points, MAP_BOX)) : [];
+  }
+
+  const api = { buildBook, mapTownCountries, LABELS };
   if (typeof module === "object" && module.exports) module.exports = api;
   else global.FamilyBook = api;
 })(typeof window !== "undefined" ? window : globalThis);

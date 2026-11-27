@@ -1,0 +1,5 @@
+// Towns of GQ (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Ciudad de la Paz",159,1082,2],["Bata",186,977,4],["Malabo",376,878,4],["San Antonio de Palé",-141,563,5],["Mongomo",163,1131,5],["Evinayong",144,1055,5],["Ebebiyin",215,1133,5],["Luba",346,855,5],["Añisoc",187,1077,7],["Aconibe",130,1094,7],["Rebola",372,883,8],["Abaamang",168,1063,8],["Aual",-145,563,9],["Mikomeseng",214,1061,9],["Cogo",108,969,9],["Mbini",158,961,9],["Nsok",113,1127,9],["Ayene",186,1069,9],["Machinda",188,995,10],["Acurenam",103,1065,10],["Santiago de Baney",370,891,10],["Bicurga",158,1047,10],["Nsang",202,1095,10],["Ncue",202,1047,10],["Bitica",143,962,11],["Río Campo",234,982,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["GQ"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

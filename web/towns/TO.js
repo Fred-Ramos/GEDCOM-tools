@@ -1,0 +1,5 @@
+// Towns of TO (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Nuku‘alofa",-2114,-17520,2],["Pangai",-1981,-17435,5],["'Ohonua",-2134,-17496,5],["Neiafu",-1865,-17398,5],["Hihifo",-1595,-17380,5],["Ha'atu'a",-2138,-17495,8],["Mu‘a",-2118,-17512,9],["Haveluloto",-2115,-17521,9],["Tofoa-Koloua",-2116,-17523,9],["Vainī",-2119,-17518,9],["Ha'ateiho",-2118,-17523,10],["Popua",-2115,-17518,10],["Nukunuku",-2113,-17530,10],["Fangale’ounga",-1975,-17432,10],["Pea",-2117,-17524,10],["Lapaha",-2118,-17512,10],["Houma",-2117,-17530,10],["Tatakamotonga",-2119,-17512,10],["Fua'amotu",-2126,-17514,10],["Leimātu'a",-1860,-17398,11],["Veitongo",-2118,-17521,11],["Hōfoa",-2113,-17523,11],["Tokomololo",-2118,-17525,11],["Kolonga",-2113,-17507,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["TO"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

@@ -1,0 +1,5 @@
+// Towns of TG (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Lomé",613,122,1],["Sokodé",898,113,5],["Kara",955,119,5],["Tsévié",643,121,5],["Dapaong",1086,21,5],["Atakpamé",753,113,5],["Kpalimé",690,63,5],["Bassar",925,78,6],["Aného",623,159,6],["Mango",1036,47,6],["Anié",775,120,6],["Notsé",695,117,6],["Sinkassé",1110,1,7],["Tchamba",903,142,7],["Sotouboua",856,98,7],["Badou",758,60,7],["Niamtougou",977,111,7],["Bafilo",935,127,7],["Tabligbo",658,150,7],["Vogan",633,153,7],["Kandé",996,104,8],["Amlamé",747,90,8],["Blitta",832,99,8],["Guérin-Kouka",969,61,8],["Afanyangan",648,165,8],["Adéta",713,73,8],["Pagouda",975,133,8],["Tohoun",703,162,9],["Elavagnon",728,72,9],["Kouniohou",767,80,9],["Danyi-Apéyémé",720,70,9],["Mandouri",1085,82,9],["Agou Gadzépé",688,73,9],["Kévé",643,93,9],["Tandjouaré",1066,20,10]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["TG"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

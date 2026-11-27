@@ -1,0 +1,5 @@
+// Towns of FO (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Tórshavn",6201,-677,2],["Tvøroyri",6156,-681,5],["Sandur",6184,-681,5],["Miðvágur",6205,-719,5],["Klaksvík",6223,-659,5],["Fuglafjørður",6224,-681,5],["Viðareiði",6236,-653,8],["Skúvoy",6177,-681,8],["Skopun",6190,-688,8],["Skálavík",6183,-666,8],["Sandavágur",6205,-715,8],["Porkeri",6148,-674,8],["Kunoy",6230,-665,8],["Kirkja",6232,-632,8],["Hvalba",6160,-696,8],["Hov",6151,-676,8],["Eiði",6230,-709,8],["Eystur",6221,-675,8],["Hoyvík",6203,-678,9],["Argir",6200,-677,10],["Vágur",6147,-681,11],["Vestmanna",6215,-717,11],["Við Sjógv",6212,-675,11],["Sørvágur",6207,-731,11],["Saltangará",6212,-672,11],["Leirvík",6221,-669,11]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["FO"] = T;
+})(typeof window !== "undefined" ? window : globalThis);

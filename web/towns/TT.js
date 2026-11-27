@@ -1,0 +1,5 @@
+// Towns of TT (1,000+ inhabitants) for the book's map: GeoNames, CC BY 4.0 (geonames.org).
+// [name, lat, lon (1/100 degree), rank (smaller = more important)], most important (then most populous) first
+(function (g) { const T = [["Port of Spain",1067,-6152,2],["Tunapuna",1065,-6139,5],["Siparia",1015,-6151,5],["Scarborough",1118,-6074,5],["Sangre Grande",1059,-6113,5],["San Fernando",1028,-6147,5],["Rio Claro",1031,-6118,5],["Princes Town",1027,-6137,5],["Point Fortin",1017,-6168,5],["Peñal",1017,-6147,5],["Laventille",1065,-6150,5],["Diego Martin",1072,-6157,5],["Couva",1042,-6147,5],["Chaguanas",1052,-6142,5],["Arima",1064,-6128,5],["Mon Repos",1028,-6145,6],["Marabella",1031,-6145,7],["Paradise",1065,-6136,7],["Arouca",1063,-6133,8],["Gasparillo",1032,-6143,8],["Petit Valley",1070,-6155,8],["Claxton Bay",1037,-6146,9],["Mucurapo",1066,-6154,9],["Tabaquite",1039,-6130,9],["Debe",1021,-6145,10],["California",1041,-6147,10],["Talparo",1050,-6127,10]];
+  if (typeof module === "object" && module.exports) module.exports = T; else (g.MapTowns = g.MapTowns || {})["TT"] = T;
+})(typeof window !== "undefined" ? window : globalThis);
