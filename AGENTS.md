@@ -62,7 +62,8 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
   Before the index, a "Lugares de nascimento" page (when people have coordinates, see gedcom-places).
 - `web/bookmap.js` - that birthplace map: a colour density (heat) layer, pale yellow to dark red, made with
   an SVG filter (blurred discs, alpha mapped to a colour ramp); the family's places are never named.
-  World (Equal Earth) plus up to 4 enlarged areas (places within 90 km of the busiest ones), each named
+  World (Equal Earth) plus up to 4 enlarged areas (places within 90 km of the busiest ones; biggest first,
+  any area with 2+ places and 5+ people fills the 4 slots, unless it is mostly visible in one already), each named
   after its main town and drawn with reference detail: up to 3 region names, then up to 45 towns (most
   important first, labels never overlap). Births = birth place, else baptism; reads `info.birth.coords`
   from tree.js (PLAC → MAP → LATI/LONG). A credit line names the data (Natural Earth, GeoNames CC BY 4.0).

@@ -5,7 +5,7 @@
 // Every person whose birth (or baptism) place has GEDCOM coordinates adds to a colour density
 // (heat) layer: pale yellow where few people were born, through orange to dark red where many were.
 // The family's places are not named. The world map (Equal Earth) shows the whole spread; the busiest
-// areas (places within 90 km of the busiest ones) get enlarged insets below, up to four, drawn with
+// areas (places within 90 km of the busiest ones) get enlarged insets below, four when there are enough, drawn with
 // reference detail (Natural Earth) and town names (GeoNames), named after their main town.
 (function (global) {
   "use strict";
@@ -180,8 +180,8 @@
     const top = Y + 9;
     const world = (lon, lat) => { const [px, py] = equalEarth(lon, lat); return [X + (px - x0) * scale, top + (yTop - py) * scale]; };
 
-    // Insets: around the place with most births, every place within 90 km; then the next place not
-    // yet covered, and so on. The busiest areas (2+ places, 3% of the people) are enlarged.
+    // Areas: around the place with most births, every place within 90 km; then the next place not
+    // yet covered, and so on.
     const clusters = [], covered = new Set();
     for (const g of groups.slice().sort((a, b) => b.n - a.n)) {
       if (covered.has(g)) continue;
@@ -189,28 +189,42 @@
       near.forEach((h) => covered.add(h));
       clusters.push({ groups: near, n: near.reduce((s, h) => s + h.n, 0) });
     }
-    const minPeople = Math.max(5, Math.round(points.length * 0.03));
-    const insets = clusters.filter((c) => c.groups.length > 1 && c.n >= minPeople).sort((a, b) => b.n - a.n).slice(0, 4);
-
-    // Inset frames: two per row under the world map.
-    const gridTop = top + worldH + 14, gap = 6;
-    const cols = insets.length > 1 ? 2 : 1;
-    const rowsN = Math.ceil(insets.length / cols);
-    const cellW = (Wd - gap * (cols - 1)) / cols;
-    const cellH = rowsN ? Math.min(95, (opts.y + opts.h - gridTop - gap * (rowsN - 1)) / rowsN) : 0;
-    const views = insets.map((c, i) => {
+    // Inset frames: two per row under the world map; up to four.
+    const gridTop = top + worldH + 14, gap = 6, bottom = opts.y + opts.h - 4;   // 4 mm for the credits
+    const frameIn = (c, cellW, innerH) => {
       const lats = c.groups.map((g) => g.lat), lons = c.groups.map((g) => g.lon);
       const lat0 = (Math.min(...lats) + Math.max(...lats)) / 2, lon0 = (Math.min(...lons) + Math.max(...lons)) / 2;
       const kx = Math.cos(lat0 * RAD);
-      const fx = X + (i % cols) * (cellW + gap), fy = gridTop + Math.floor(i / cols) * (cellH + gap);
-      const innerH = cellH - 6;
       const spanLat = Math.max((Math.max(...lats) - Math.min(...lats)) * 1.35, 0.5);
       const spanLon = Math.max((Math.max(...lons) - Math.min(...lons)) * 1.35, 0.5 / kx);
       const s = Math.min(cellW / (spanLon * kx), innerH / spanLat);           // mm per degree of latitude
-      const proj = (lon, lat) => [fx + cellW / 2 + (lon - lon0) * kx * s, fy + 6 + innerH / 2 - (lat - lat0) * s];
       const halfLon = cellW / 2 / (kx * s), halfLat = innerH / 2 / s;
-      const box = [lon0 - halfLon, lat0 - halfLat, lon0 + halfLon, lat0 + halfLat];
-      const inside = groups.filter((g) => g.lon >= box[0] && g.lon <= box[2] && g.lat >= box[1] && g.lat <= box[3]);
+      return { lat0, lon0, kx, s, box: [lon0 - halfLon, lat0 - halfLat, lon0 + halfLon, lat0 + halfLat] };
+    };
+    const within = (g, box) => g.lon >= box[0] && g.lon <= box[2] && g.lat >= box[1] && g.lat <= box[3];
+    // Biggest areas first (2+ places, 5+ people), up to four, so the page is filled; an area that is
+    // mostly visible in an inset already chosen is skipped.
+    const insets = [], chosenBoxes = [];
+    const fullH = Math.min(95, (bottom - gridTop - gap) / 2) - 6, halfW = (Wd - gap) / 2;
+    for (const c of clusters.sort((a, b) => b.n - a.n)) {
+      if (insets.length >= 4) break;
+      if (c.groups.length < 2 || c.n < 5) continue;
+      const seen = c.groups.filter((g) => chosenBoxes.some((b) => within(g, b))).reduce((t, g) => t + g.n, 0);
+      if (seen * 2 >= c.n) continue;
+      insets.push(c);
+      chosenBoxes.push(frameIn(c, halfW, fullH).box);
+    }
+
+    const cols = insets.length > 1 ? 2 : 1;
+    const rowsN = Math.ceil(insets.length / cols);
+    const cellW = (Wd - gap * (cols - 1)) / cols;
+    const cellH = rowsN ? Math.min(95, (bottom - gridTop - gap * (rowsN - 1)) / rowsN) : 0;
+    const views = insets.map((c, i) => {
+      const fx = X + (i % cols) * (cellW + gap), fy = gridTop + Math.floor(i / cols) * (cellH + gap);
+      const innerH = cellH - 6;
+      const { lat0, lon0, kx, s, box } = frameIn(c, cellW, innerH);
+      const proj = (lon, lat) => [fx + cellW / 2 + (lon - lon0) * kx * s, fy + 6 + innerH / 2 - (lat - lat0) * s];
+      const inside = groups.filter((g) => within(g, box));
       // Weighted centre of the births, to name the inset after the main city near it.
       const n = inside.reduce((t, g) => t + g.n, 0);
       const centre = { lat: inside.reduce((t, g) => t + g.lat * g.n, 0) / n, lon: inside.reduce((t, g) => t + g.lon * g.n, 0) / n };
@@ -329,7 +343,7 @@
       s += regionSvg + townSvg + `</g>`;
     }
     // Credits for the map data.
-    s += `<text x="${f2(X + Wd)}" y="${f2(opts.y + opts.h + 1)}" font-size="1.9" text-anchor="end" fill="#888">${esc(L.credit)}</text>`;
+    s += `<text x="${f2(X + Wd)}" y="${f2(opts.y + opts.h - 0.5)}" font-size="1.9" text-anchor="end" fill="#888">${esc(L.credit)}</text>`;
     return s;
   }
 
