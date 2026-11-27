@@ -43,7 +43,7 @@ Peneireiros, Veade", "de Victoria, Porto") is the birthplace in parish-record st
 birth keyword.
 
 ### Nationality
-"Brasileiro/Brasileira" → `BIRT.PLAC` "Brazil"; "Português/Portuguesa" → "Portugal";
+"Brasileiro/Brasileira" → `BIRT.PLAC` "Brasil"; "Português/Portuguesa" → "Portugal";
 "Espanhol/Espanhola" → "Spain". Only when no more specific birthplace is known
 (neither in the note nor in `existing.BIRT.PLAC`).
 
@@ -167,5 +167,5 @@ Allowed: individuals → `BIRT BAPM DEAT BURI RESI` (objects with `DATE PLAC CAU
 > Brasileiro
 
 ```json
-"@I0003@": {"BIRT": {"PLAC": "Brazil"}, "NOTE": null}
+"@I0003@": {"BIRT": {"PLAC": "Brasil"}, "NOTE": null}
 ```
