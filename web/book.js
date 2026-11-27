@@ -27,7 +27,7 @@
     pt: {
       title: "Livro de Família", contents: "Índice geral", index: "Índice onomástico", family: "Família",
       familyOf: "Família de",
-      otherFamilies: "Outras famílias", marriageNo: (n) => `${n}.º casamento`, separated: "sep.",
+      otherFamilies: "Outras famílias", separated: "sep.",
       people: "pessoas", families: "casais",
       map: "Lugares de nascimento", mapLess: "Menos", mapMore: "Mais nascimentos",
       mapCredit: "Dados do mapa: Natural Earth · GeoNames (CC BY 4.0)",
@@ -43,7 +43,6 @@
       title: "Family Book", contents: "Contents", index: "Index of names", family: "Family",
       familyOf: "Family of",
       otherFamilies: "Other families", separated: "sep.",
-      marriageNo: (n) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"} marriage`,
       people: "people", families: "couples",
       map: "Birthplaces", mapLess: "Fewer", mapMore: "More births",
       mapCredit: "Map data: Natural Earth · GeoNames (CC BY 4.0)",
@@ -275,7 +274,7 @@
         const markB = b.b ? (fullB ? num(b.b) : goto("→ p.", () => fullPage(b.b))) : null;
         const spouseParents = b.b && idx.parentFamily(b.b) ? goto("◄ p.", () => childPage(b.b)) : null;
         const n = unionNo(b.a, b.fam);
-        const nameA = b.second && !fullA ? `${displayName(b.a)} (${L.marriageNo(n)})` : displayName(b.a);
+        const nameA = displayName(b.a);              // the union's order shows as ∞¹ ∞² next to the spouse
         const married = level !== "compact" && f.marriage.year ? `${yr(f.marriage.year)} ` : "";
         const nameB = `∞${sup(n)} ${married}${b.b ? displayName(b.b) : "?"}${divorceText(b.fam)}`;
         // At a full entry, every other union of that person that is not stacked right here.
@@ -307,7 +306,7 @@
         else seg(b.pid, true, [row(displayName(b.pid), { bold: true }, [num(b.pid)]), ...lifeRows(b.pid, [], framed), ...occupation(b.pid)]);
       } else {
         const target = b.kind === "cut" ? goto("→ p.", () => famPage.get(b.fam)) : goto("→ p.", () => fullPage(b.pid));
-        const name = b.second ? `${displayName(b.pid)} (${L.marriageNo(unionNo(b.pid, b.fam))})` : displayName(b.pid);
+        const name = displayName(b.pid);
         const style = { italic: true, color: "#444" };
         if (level === "compact") seg(b.pid, false, [row(`${name} ${yearsText(b.pid)}`.trim(), style, [target])]);
         else seg(b.pid, false, [row(name, style, [num(b.pid)]), row(yearsText(b.pid), { color: "#444" }, [target])]);
