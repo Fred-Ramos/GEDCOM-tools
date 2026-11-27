@@ -82,6 +82,9 @@
         death: { year: died, place: placeOf(p.DEAT) || placeOf(p.BURI) },
         occupation: asList(p.OCCU).map((o) => (o && typeof o === "object" ? o._NAME : o)).filter(Boolean).join(", "),
         nick: (() => { const nk = first(n.NICK); return nk && typeof nk === "object" ? nk._NAME : nk || ""; })(),
+        // Free-text note(s), joined; a NOTE may be a string, an object with _NAME, or a list of those.
+        note: asList(p.NOTE).map((o) => (o && typeof o === "object" ? o._NAME : o))
+          .filter((t) => typeof t === "string" && t.trim()).join("\n"),
         // Path of the person's photo (GEDCOM OBJE/FILE), if any.
         photo: (() => {
           const o = first(p.OBJE);

@@ -12,7 +12,9 @@
 //
 // Page breaks: a family whose children would fall beyond the 4th column, or a page that is too tall,
 // is cut off (largest branch first) and continues as its own chart. Small charts share pages.
-// Notes are never printed. Output: one SVG string per A4 page (mm units), for preview and printing.
+// Notes are not printed in the charts; the index of names lists each person's note under their name
+// (standard and detailed levels), leaving out the "Apelido deduzido" lines that the gedcom-surnames
+// skill adds. Output: one SVG string per A4 page (mm units), for preview and printing.
 (function (global) {
   "use strict";
 
@@ -54,6 +56,9 @@
   const FONT = 2.3, FONT_NAME = 2.45, FONT_SMALL = 1.9;
   const LEVELS = ["compact", "standard", "detailed"];
   const MIN_SCALE = 0.86;                     // a line may shrink this much before it wraps instead
+  // Lines the gedcom-surnames skill adds to a note to mark a worked-out surname: not printed.
+  const DEDUCED_SURNAME = /^\s*Apelido deduzido \(não registado\)/i;
+  const IDX_LH = 3.1, IDX_NOTE = 1.85, IDX_NOTE_LH = 2.45, IDX_INDENT = 2.5;
 
   // Text width in mm. In the browser it is measured on a canvas with the page's own fonts; elsewhere
   // (tests, Node) it is estimated, a little generously.
@@ -527,6 +532,15 @@
     // Charts.
     const chartSvgs = chartPages.map((p) => svg(p.charts.map(drawChart).join(""), p.no));
 
+    // A person's note for the index: wrapped lines, without the deduced-surname marks.
+    const noteLines = (pid) => {
+      if (level === "compact") return [];
+      const width = (PAGE_W - 2 * ML - 6) / 2 - IDX_INDENT;
+      return String(info(pid).note || "").split(/\r?\n|<br\s*\/?>/i)
+        .map((t) => t.replace(/\s+/g, " ").trim()).filter((t) => t && !DEDUCED_SURNAME.test(t))
+        .flatMap((t) => wrapText(t, IDX_NOTE, false, true, width, width));
+    };
+
     // Index (needs the appearances recorded while drawing the charts).
     const indexStart = chartPages.length ? chartPages[chartPages.length - 1].no + 1 : pageNo;
     // In number order, which is alphabetical.
@@ -534,26 +548,36 @@
       const { p, sur, given } = nameParts(pid);
       const label = sur ? `${sur}, ${given}` : `${p.name} (${L.noSurname})`;
       const pgs = [...appearances.get(pid)].sort((a, b) => a[0] - b[0]);
-      return { label: `${label}${p.years ? ` (${p.years})` : ""}`, no: number.get(pid), pages: pgs };
+      return { label: `${label}${p.years ? ` (${p.years})` : ""}`, no: number.get(pid), pages: pgs,
+               note: noteLines(pid) };
     });
-    const perColumn = Math.floor((BODY - 10) / 3.1);
+    // Entries flow down two columns per page; a person's note (wrapped) sits under their name.
     const colW = (PAGE_W - 2 * ML - 6) / 2;
+    const colTop = MT + 10, colBottom = PAGE_H - MB;
     const indexSvgs = [];
-    for (let i = 0, page = indexStart; i < entries.length; i += perColumn * 2, page++) {
-      let s = `<text x="${ML}" y="${MT + 2}" font-size="5" font-weight="bold" fill="#2a1d12">${esc(L.index)}</text>`;
-      for (let col = 0; col < 2; col++) {
-        entries.slice(i + col * perColumn, i + (col + 1) * perColumn).forEach((e, row) => {
-          const x = ML + col * (colW + 6);
-          const y = MT + 10 + row * 3.1;
-          const pagesText = e.pages.map(([pg, full]) => (full ? `<tspan font-weight="bold">${pg}</tspan>` : `${pg}`)).join(", ");
-          const plain = e.pages.map(([pg]) => pg).join(", ");
-          s += `<text x="${f2(x)}" y="${f2(y)}" font-size="2.2" fill="#111">${esc(fit(e.label, Math.floor(colW / 1.05) - plain.length - 8))}` +
-               `${e.no ? ` <tspan fill="#777" font-size="1.8">[${e.no}]</tspan>` : ""}</text>` +
-               `<text x="${f2(x + colW)}" y="${f2(y)}" font-size="2.2" text-anchor="end" fill="#333">${pagesText}</text>`;
-        });
+    let s = "", col = 0, y = colTop, page = indexStart;
+    const startPage = () => { s = `<text x="${ML}" y="${MT + 2}" font-size="5" font-weight="bold" fill="#2a1d12">${esc(L.index)}</text>`; };
+    startPage();
+    for (const e of entries) {
+      const h = IDX_LH + e.note.length * IDX_NOTE_LH;
+      if (y + h - IDX_LH > colBottom - 1 && y > colTop) {
+        if (col === 0) col = 1;
+        else { indexSvgs.push(svg(s, page++)); startPage(); col = 0; }
+        y = colTop;
       }
-      indexSvgs.push(svg(s, page));
+      const x = ML + col * (colW + 6);
+      const pagesText = e.pages.map(([pg, full]) => (full ? `<tspan font-weight="bold">${pg}</tspan>` : `${pg}`)).join(", ");
+      const plain = e.pages.map(([pg]) => pg).join(", ");
+      s += `<text x="${f2(x)}" y="${f2(y)}" font-size="2.2" fill="#111">${esc(fit(e.label, Math.floor(colW / 1.05) - plain.length - 8))}` +
+           `${e.no ? ` <tspan fill="#777" font-size="1.8">[${e.no}]</tspan>` : ""}</text>` +
+           `<text x="${f2(x + colW)}" y="${f2(y)}" font-size="2.2" text-anchor="end" fill="#333">${pagesText}</text>`;
+      e.note.forEach((ln, k) => {
+        s += `<text x="${f2(x + IDX_INDENT)}" y="${f2(y + IDX_LH - 0.55 + k * IDX_NOTE_LH)}" font-size="${f2(ln.size)}"` +
+             ` font-style="italic" fill="#555">${esc(ln.text)}</text>`;
+      });
+      y += h;
     }
+    if (entries.length) indexSvgs.push(svg(s, page));
 
     // Contents.
     const toc = [];
