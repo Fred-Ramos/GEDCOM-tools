@@ -177,7 +177,7 @@
 </head>
 <body>
 <div class="window" id="window">
-  <div class="titlebar"><span>GEDCOM Tools</span><span>.ftz &rarr; .ged</span></div>
+  <div class="titlebar"><span>GEDCOM Tools</span><span>.ftz &harr; .ged</span></div>
   <div class="content">
     <div role="tablist" aria-label="Tools">
       <button role="tab" id="tab-convert" aria-controls="panel-convert" aria-selected="true">Convert</button>
@@ -211,6 +211,19 @@
           <button id="save-zip" disabled title="The .ged and the photos folder it links to">Save .zip (.ged + photos)</button>
           <button id="save-json" disabled>Save .json</button>
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>3. GEDCOM &rarr; Quick Family Tree (.ftz)</legend>
+        <div class="row">
+          <button id="ftz-open" disabled>Open .zip / .ged&hellip;</button>
+          <div class="field grow" id="ftz-name">No file opened</div>
+          <button id="ftz-save" disabled>Save .ftz</button>
+        </div>
+        <input type="file" id="ftz-file" accept=".zip,.ged,.json" class="visually-hidden" tabindex="-1" aria-hidden="true">
+        <p class="hint" id="ftz-result">What the app has no field for (places, baptism, burial, occupations,
+          marriages, other names, dates like "c. 1850") goes into each person's note, under a GEDCOM header,
+          and comes back when the .ftz is converted here again.</p>
       </fieldset>
 
       <fieldset>
@@ -310,7 +323,7 @@
 // Python (the converter in src/, run in the browser with Pyodide)
 // ------------------------------------------------------------------
 const SRC = "../src/gedcom_tools/";
-const MODULES = ["__init__", "converter", "enums", "models", "utils"];
+const MODULES = ["__init__", "converter", "enums", "models", "utils", "ftz_writer"];
 const GLUE = `
 import sys, json, zipfile
 from io import BytesIO
@@ -344,6 +357,16 @@ def web_read_zip(js_bytes):
                        "photos": {path: base64.b64encode(image).decode() for path, image in photos.items()}},
                       ensure_ascii=False)
 
+def web_to_ftz(js_bytes, filename):
+    """A .zip (.ged + photos), .ged or .json -> .ftz, kept in LAST until saved."""
+    from gedcom_tools.ftz_writer import file_to_ftz, describe
+    ftz, report = file_to_ftz(js_bytes.to_bytes(), filename)
+    LAST["ftz"] = ftz
+    return json.dumps({"summary": describe(report), "report": report}, ensure_ascii=False)
+
+def web_ftz():
+    return LAST["ftz"]
+
 def web_read_ged(js_bytes):
     raw = js_bytes.to_bytes()
     try:
@@ -367,12 +390,16 @@ async function startPython() {
   const webReadGed = pyodide.globals.get("web_read_ged");
   const webZip = pyodide.globals.get("web_zip");
   const webReadZip = pyodide.globals.get("web_read_zip");
+  const webToFtz = pyodide.globals.get("web_to_ftz");
+  const webFtz = pyodide.globals.get("web_ftz");
   return {
     version: pyodide.globals.get("__version__"),
     convert: (bytes, stem) => JSON.parse(webConvert(bytes, stem)),
     zip: () => { const proxy = webZip(); const bytes = proxy.toJs(); proxy.destroy(); return bytes; },
     readGed: (bytes) => JSON.parse(webReadGed(bytes)),
     readZip: (bytes) => JSON.parse(webReadZip(bytes)),
+    toFtz: (bytes, name) => JSON.parse(webToFtz(bytes, name)),
+    ftz: () => { const proxy = webFtz(); const bytes = proxy.toJs(); proxy.destroy(); return bytes; },
   };
 }
 
@@ -479,6 +506,28 @@ $("save-zip").addEventListener("click", () =>
   save(state.python.zip(), state.stem + ".zip", "application/zip"));
 $("save-json").addEventListener("click", () =>
   save(JSON.stringify(state.result.tree, null, 2), state.stem + ".json", "application/json"));
+
+// GEDCOM -> .ftz
+$("ftz-open").addEventListener("click", () => $("ftz-file").click());
+$("ftz-file").addEventListener("change", async () => {
+  const file = $("ftz-file").files[0];
+  $("ftz-file").value = "";
+  if (!file) return;
+  $("ftz-name").textContent = file.name;
+  $("ftz-save").disabled = true;
+  setStatus(`Converting ${file.name} to .ftz…`);
+  try {
+    const result = state.python.toFtz(new Uint8Array(await file.arrayBuffer()), file.name);
+    state.ftzName = file.name.replace(/\.(zip|ged|json)$/i, "") + ".ftz";
+    $("ftz-result").textContent = result.summary + ".";
+    $("ftz-save").disabled = false;
+    setStatus(`Converted ${file.name}: save ${state.ftzName}.`);
+  } catch (error) {
+    setStatus("Error: " + lastLine(error));
+  }
+});
+$("ftz-save").addEventListener("click", () =>
+  save(state.python.ftz(), state.ftzName, "application/zip"));
 
 // Drag and drop onto the window
 const win = $("window");
@@ -607,6 +656,7 @@ $("tree-file-input").addEventListener("change", () => {
 startPython().then((python) => {
   state.python = python;
   $("open").disabled = false;
+  $("ftz-open").disabled = false;
   $("tree-open").disabled = false;
   $("python").textContent = "Python: ready";
   $("version").textContent = "v" + python.version;

@@ -20,7 +20,8 @@ from .utils import (
     GED_MONTHS,
     fmt_ged_date,
     sex_to_ged,
-    remove_empty_strings
+    remove_empty_strings,
+    parse_exact_date
 )
 from .enums import Tags as T
 
@@ -150,14 +151,122 @@ def build_indexes(people_by_id: Dict[int, Person_FTT],
     for p in people_by_id.values():
         if p.parent_couple_id and p.parent_couple_id in couples_by_id:
             children_of_couple[p.parent_couple_id].append(p.id)
+    # Children in the app's sibling order (column 3 of a person).
+    for kids in children_of_couple.values():
+        kids.sort(key=lambda pid: people_by_id[pid].unk4)
 
     couples_of_person: Dict[int, List[int]] = {person_id: [] for person_id in people_by_id}
+    order: Dict[Tuple[int, int], int] = {}
     for c in couples_by_id.values():
-        for person_id in (c.male_id, c.female_id): # For the male member and female member
-            if person_id and person_id in couples_of_person: #
+        # The app numbers each person's unions: column 3 for the man, column 5 for the woman.
+        for person_id, n in ((c.male_id, c.unk4), (c.female_id, c.unk6)):
+            if person_id and person_id in couples_of_person:
                 couples_of_person[person_id].append(c.id)
+                order[(person_id, c.id)] = n
+    for person_id, couples in couples_of_person.items():
+        couples.sort(key=lambda cid: order[(person_id, cid)])
 
     return children_of_couple, couples_of_person 
+
+# ---------------------------
+# Notes with a GEDCOM section (written by ftz_writer for what an .ftz cannot hold)
+# ---------------------------
+# A note may end with a section headed "GEDCOM": GEDCOM lines (level 0 = INDI for the person, or
+# "FAM n" for the person's n-th union, or "FAM CHILD" for their parents' family) that are applied
+# back when the .ftz is converted. The person's own note then sits under a "NOTES" header:
+#     NOTES
+#     Padrinhos ...
+#
+#     GEDCOM
+#     0 INDI
+#     1 BIRT
+#     2 PLAC Porto
+NOTES_HEADER = "NOTES"
+GEDCOM_HEADER = "GEDCOM"
+INDI_ORDER = ["_PDEF", "NAME", "SEX", "BIRT", "BAPM", "RESI", "OCCU", "DEAT", "BURI", "FAMC", "FAMS", "NOTE"]
+FAM_ORDER = ["_PDEF", "HUSB", "WIFE", "MARR", "DIV", "CHIL"]
+
+def ordered(record: dict, order: List[str]) -> dict:
+    """The record with the tags of `order` first, in that order, then the others as they were."""
+    out = {k: record[k] for k in order if k in record}
+    out.update({k: v for k, v in record.items() if k not in out})
+    return out
+
+def split_note(text: str):
+    """(the person's own note or None, the GEDCOM section as JSON or None)."""
+    if not text:
+        return None, None
+    lines = text.split("\n")
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].strip() != GEDCOM_HEADER:
+            continue
+        rest = [ln for ln in lines[i + 1:] if ln.strip()]
+        if not rest or not all(_GED_LINE.match(ln) for ln in rest):
+            break
+        try:
+            extra = gedcom_to_json("\n".join(rest))
+        except ValueError:
+            break
+        human = lines[:i]
+        if human and human[0].strip() == NOTES_HEADER:
+            human = human[1:]
+        human = "\n".join(human).strip("\n")
+        return (human or None), extra
+    return text, None
+
+def name_parts(name) -> Tuple[str, str]:
+    """(given, surname) of a NAME value (string, object or list: the first name counts)."""
+    first = name[0] if isinstance(name, list) and name else name
+    if isinstance(first, dict):
+        full, given, surname = str(first.get(T._NAME) or ""), first.get(T.GIVEN), first.get(T.SURNAME)
+    else:
+        full, given, surname = str(first or ""), None, None
+    if given is not None and surname is None:
+        # The surname is the /.../ after the given name (which may itself contain a "/").
+        rest = full[len(given):] if full.startswith(str(given)) else full
+        m = re.search(r"/(.*?)/", rest)
+        surname = m.group(1) if m else ""
+    m = re.match(r"^(.*?)/(.*?)/", full)
+    if given is None:
+        given = (m.group(1) if m else full)
+    if surname is None:
+        surname = m.group(2) if m else ""
+    return " ".join(str(given).split()), " ".join(str(surname).split())
+
+def _merge_name(extra, given: str, surname: str):
+    """A full NAME from the GEDCOM section, with the name typed in the app when it was changed there."""
+    if name_parts(extra) == (given, surname):
+        return extra
+    names = list(extra) if isinstance(extra, list) else [extra]
+    first = dict(names[0]) if isinstance(names[0], dict) else {}
+    first.update({T._NAME: f"{given} /{surname}/", T.GIVEN: given, T.SURNAME: surname})
+    names[0] = remove_empty_strings(first)
+    return names if isinstance(extra, list) else names[0]
+
+def _merge_event(made, extra):
+    """BIRT/DEAT from the app's fields (`made`) completed by the GEDCOM section (`extra`).
+    A date typed in the app wins over a different one in the section."""
+    if not isinstance(made, dict) or not isinstance(extra, dict):
+        return extra
+    out = dict(extra)
+    date = made.get(T.DATE)
+    if date and parse_exact_date(out.get(T.DATE)) != parse_exact_date(date):
+        if T.DATE in out:
+            out[T.DATE] = date
+        else:
+            out = {T.DATE: date, **out}
+    return out
+
+def apply_indi_extra(node: dict, extra: dict, given: str, surname: str) -> None:
+    for tag, value in extra.items():
+        if tag == T._PDEF:
+            continue
+        if tag == T.NAME:
+            node[tag] = _merge_name(value, given, surname)
+        elif tag in (T.BIRTH, T.DEATH):
+            node[tag] = _merge_event(node.get(tag), value)
+        else:
+            node[tag] = value
 
 # ---------------------------
 # GEDCOM export
@@ -217,6 +326,7 @@ def to_json(people_by_id: Dict[int, Person_FTT],
     fam_ptr = {couple_id: f"@F{idx:04d}@" for idx, couple_id in enumerate(couple_ids)}  # Generate pointers for families
 
     children_of_couple, couples_of_person = build_indexes(people_by_id, couples_by_id)
+    fam_extras: Dict[int, List[dict]] = {}   # couple id -> GEDCOM sections found in notes
 
     # INDI records ------------------------------------------
     for person_id in person_ids:
@@ -241,7 +351,8 @@ def to_json(people_by_id: Dict[int, Person_FTT],
 
         # Death
         ddate = fmt_ged_date(p.death_year, p.death_month, p.death_day)
-        if p.death_event and (ddate or p.death_event == 128):
+        # 128 = date known, 3 = deceased without a date, 2 = nothing recorded.
+        if p.death_event and (ddate or p.death_event in (128, 3)):
             node[T.DEATH] = {T.DATE: ddate} if ddate else "Y"
 
         # Family as a child
@@ -263,12 +374,29 @@ def to_json(people_by_id: Dict[int, Person_FTT],
         if photos and person_id in photos:
             node[T.OBJECT] = {T.FILE: {T._NAME: photos[person_id], T.FORM: "jpg"}}
 
-        # Notes
-        note_text = p.note or p.addition
-        if note_text:
-            node[T.NOTE] = note_text
+        # Notes: the note and the app's short "addition" line, with <br> as line breaks.
+        note_text = "\n".join(x for x in (p.note, p.addition) if x)
+        note_text = re.sub(r"<br\s*/?>", "\n", note_text, flags=re.IGNORECASE)
+        human, extra = split_note(note_text)
+        if human:
+            node[T.NOTE] = human
+        if extra:
+            for indi in extra.get(T.INDIVIDUAL, []):
+                if isinstance(indi, dict):
+                    apply_indi_extra(node, indi, p.name, p.surname)
+            for fam in extra.get(T.FAMILY, []) if isinstance(extra.get(T.FAMILY), list) else [extra.get(T.FAMILY)]:
+                if not isinstance(fam, dict):
+                    continue
+                which = str(fam.get(T._NAME, "")).strip().upper()
+                if which == "CHILD":
+                    target = p.parent_couple_id
+                else:
+                    unions = couples_of_person.get(person_id, [])
+                    target = unions[int(which) - 1] if which.isdigit() and 0 < int(which) <= len(unions) else None
+                if target in fam_ptr:
+                    fam_extras.setdefault(target, []).append({k: v for k, v in fam.items() if k != T._NAME})
 
-        DOCUMENT[T.INDIVIDUAL].append(node)
+        DOCUMENT[T.INDIVIDUAL].append(ordered(node, INDI_ORDER))
     
     # FAM records -------------------------------------------
     for couple_id in couple_ids:
@@ -290,7 +418,10 @@ def to_json(people_by_id: Dict[int, Person_FTT],
         if c.divorce == 1:
             node[T.DIVORCE] = "Y"
 
-        DOCUMENT[T.FAMILY].append(node)
+        for extra in fam_extras.get(couple_id, []):
+            node.update(extra)
+
+        DOCUMENT[T.FAMILY].append(ordered(node, FAM_ORDER))
 
     # Trailer block --------------------------------------------
     DOCUMENT["TRLR"] = {}

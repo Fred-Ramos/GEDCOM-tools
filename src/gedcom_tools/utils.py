@@ -64,3 +64,23 @@ def fmt_ged_date(y, m, d) -> Optional[str]:
 
 def sex_to_ged(sex_code: int) -> str:
     return {1: "M", 2: "F"}.get(sex_code, "U")
+
+_MONTH_NUMBER = {m.upper(): i for i, m in enumerate(GED_MONTHS) if m}
+
+def parse_exact_date(value):
+    """(year, month, day) of a plain GEDCOM date ("7 Jan 1900", "Jan 1900", "1900"), month and day
+    None when absent; None for anything else (qualified dates, ranges, text)."""
+    import re
+    if not isinstance(value, str):
+        return None
+    m = re.fullmatch(r"\s*(?:(\d{1,2})\s+)?(?:([A-Za-z]{3})\s+)?(\d{1,4})\s*", value)
+    if not m or (m.group(1) and not m.group(2)):
+        return None
+    month = _MONTH_NUMBER.get(m.group(2).upper()) if m.group(2) else None
+    if m.group(2) and not month:
+        return None
+    day = int(m.group(1)) if m.group(1) else None
+    if day is not None and not 1 <= day <= 31:
+        return None
+    year = int(m.group(3))
+    return (year, month, day) if year > 0 else None

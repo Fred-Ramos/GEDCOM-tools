@@ -8,7 +8,8 @@ Converts Quick Family Tree `.ftz` archives into GEDCOM 5.5.1. Python 3.8+, stand
 - `main.py` - CLI wrapper around `gedcom_tools.cli:main` (also the `gedcom-tools` command from `pyproject.toml`).
 - `web/index.html` - static page that runs the package in the browser with Pyodide (fetches
   `../src/gedcom_tools/*.py`; the module list is hardcoded in the page, so update it when adding a module
-  the converter imports). No build step, no npm. Two tabs: Convert, and Family tree.
+  the converter imports). No build step, no npm. Two tabs: Convert, and Family tree. Convert also has a
+  "GEDCOM → .ftz" section (a .zip/.ged/.json back to a Quick Family Tree file, `ftz_writer.file_to_ftz`).
   Retro 90s desktop style on purpose: square corners, bevelled grey, no rounded edges; the window fills
   the screen. A third tab, Book, builds the family book (web/book.js).
 - `web/tree.js` - the Family tree tab (plain JS, also loadable in Node for tests). It reads the tree
@@ -71,6 +72,21 @@ with `photo_dir`, `ftz_to_json` links each person to `<photo_dir>/<id>.jpg` (`OB
 Output format everywhere (CLI, web, both skills): `<name>.zip` = `<name>.ged` + the `<name>_photos/` folder
 it links to, and `<name>.json` outside the zip (`write_outputs`, `make_zip`, `read_zip`, `collect_photos`).
 Skills find a tree's photos next to its .json, inside `<name>.zip`, or inside another .zip in the folder.
+`node.ftt` (UTF-8 with BOM, tab-separated): header `people couples last-person-id`; person lines of 29
+columns (0 id, 2 parent couple, 3 sibling order, 12 surname, 13 given, 16-19 birth code/y/m/d,
+20-23 death code/y/m/d, 24 sex 1/2, 25 the app's short "addition" line, 28 note with `<br>`); couple lines
+of 12 (0 id, 1 divorced, 2 man, 3 his union order, 4 woman, 5 her union order). Event codes: 128 = date
+known, 3 = deceased without a date, 2 = nothing. Columns 6-7 are layout positions (0.00 = automatic).
+The converter joins note + addition, turns `<br>` into line breaks, and orders unions and children by
+the app's order columns.
+
+Back to .ftz: `ftz_writer.json_to_ftz` / `file_to_ftz` (CLI: `main.py tree.zip` writes `tree.ftz`, never
+overwriting). New ids follow the record order, so pointers come back the same. What the app has no field
+for goes into the person's note as GEDCOM lines, after the person's own note:
+`NOTES` / own note / blank line / `GEDCOM` / `0 INDI` + level-1 tags, `0 FAM n` (the person's n-th union;
+on the husband, else the wife) or `0 FAM CHILD` (their parents' family, when it has no spouse).
+`split_note` / `apply_indi_extra` in converter.py apply it back (a date or name changed in the app wins).
+.ged → .ftz → .ged gives the same records (line order inside a record follows `INDI_ORDER`/`FAM_ORDER`).
 `gedcom_to_json(text)` is the reverse of `json_to_gedcom`: it reads any GEDCOM (ours or another
 program's) into the same JSON shape, joining CONT/CONC. A tag that repeats becomes a list; INDI, FAM,
 FAMC, FAMS and CHIL are always lists.
